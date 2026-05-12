@@ -1,4 +1,10 @@
-SELECT TOP 10
+/*
+Logique du filtre :
+ConditionDescriptionapp.grdf_hatvp = 1RDV directement marqué HATVPEXISTS (... Contact.grdf_hatvp = 1)Au moins un participant (obligatoire ou facultatif) est un contact HATVP
+Les deux conditions sont reliées par un OR → un RDV est inclus dès que l'une des deux est vraie.
+
+*/
+SELECT
     app.ActivityId,
     app.grdf_hatvp,
     app.Subject                         AS Libelle,
@@ -11,7 +17,7 @@ SELECT TOP 10
     MAX(sm_reason.Value)                AS RaisonStatut,
     -- Participants obligatoires (ParticipationTypeMask = 5)
     (
-        SELECT STRING_AGG(ap.PartyIdName, ', ')
+        SELECT STRING_AGG(CAST(ap.PartyIdName AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY ap.PartyIdName)
         FROM dbo.ActivityParty AS ap
         WHERE ap.ActivityId             = app.ActivityId
@@ -20,7 +26,7 @@ SELECT TOP 10
     )                                   AS Participants,
     -- Participants facultatifs (ParticipationTypeMask = 6)
     (
-        SELECT STRING_AGG(ap.PartyIdName, ', ')
+        SELECT STRING_AGG(CAST(ap.PartyIdName AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY ap.PartyIdName)
         FROM dbo.ActivityParty AS ap
         WHERE ap.ActivityId             = app.ActivityId
@@ -65,7 +71,7 @@ SELECT TOP 10
     MAX(sm_prio.Value)                  AS Priorite,
     -- Thématiques
     (
-        SELECT STRING_AGG(sm_them.Value, ', ')
+        SELECT STRING_AGG(CAST(sm_them.Value AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY sm_them.Value)
         FROM dbo.StringMap AS sm_them
         WHERE sm_them.ObjectTypeCode    = 4201
@@ -78,7 +84,7 @@ SELECT TOP 10
     )                                   AS Thematiques,
     -- HATVP Type de décision visée
     (
-        SELECT STRING_AGG(sm_dec.Value, ', ')
+        SELECT STRING_AGG(CAST(sm_dec.Value AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY sm_dec.Value)
         FROM dbo.StringMap AS sm_dec
         WHERE sm_dec.ObjectTypeCode     = 4201
@@ -89,14 +95,16 @@ SELECT TOP 10
               ) > 0
           AND sm_dec.LangId             = 1036
     )                                   AS HATVP_TypeDecisionVisee,
-    -- Comptes rendus (Titre + Description)
+    -- Comptes rendus
     (
         SELECT STRING_AGG(
-            ISNULL(cr.grdf_titre, '') 
-                + CASE WHEN cr.grdf_description IS NOT NULL 
-                       THEN ' | ' + cr.grdf_description 
-                       ELSE '' 
-                  END,
+            CAST(
+                ISNULL(cr.grdf_titre, '')
+                    + CASE WHEN cr.grdf_description IS NOT NULL
+                           THEN ' | ' + cr.grdf_description
+                           ELSE ''
+                      END
+            AS NVARCHAR(MAX)),
             ' ;; '
         ) WITHIN GROUP (ORDER BY cr.grdf_titre)
         FROM dbo.grdf_compte_rendu AS cr
@@ -127,12 +135,23 @@ LEFT JOIN dbo.StringMap AS sm_prio
     AND sm_prio.AttributeName   = 'prioritycode'
     AND sm_prio.AttributeValue  = app.PriorityCode
     AND sm_prio.LangId          = 1036
-WHERE app.ActivityId IN (
-    '93e62a73-0143-f111-8141-005056be5b03',
-    '3b2803ca-c72d-f111-8144-005056be1732',
-    '92512192-4aed-f011-813d-005056beef00',
-	'93140e6c-322f-f111-813f-005056be7218'
-)
+WHERE app.CreatedOn >= '2023-01-01'
+  AND (
+        -- CAS 1 : Le RDV est marqué HATVP
+        app.grdf_hatvp = 1
+        OR
+        -- CAS 2 : Au moins un contact participant (mask 5 ou 6) est HATVP
+        EXISTS (
+            SELECT 1
+            FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c
+                ON  c.ContactId         = ap.PartyId
+                AND c.grdf_hatvp        = 1
+            WHERE ap.ActivityId         = app.ActivityId
+              AND ap.ParticipationTypeMask IN (5, 6)
+              AND ap.IsPartyDeleted      = 0
+        )
+      )
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
@@ -148,4 +167,3 @@ GROUP BY
     app.ActualDurationMinutes,
     app.grdf_thematique,
     app.grdf_type_decision_vise
-
