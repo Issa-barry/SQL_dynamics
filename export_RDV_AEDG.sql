@@ -1,4 +1,4 @@
-SELECT TOP 10
+SELECT
     app.ActivityId,
     app.grdf_hatvp,
     app.Subject                         AS Libelle,
@@ -89,13 +89,13 @@ SELECT TOP 10
               ) > 0
           AND sm_dec.LangId             = 1036
     )                                   AS HATVP_TypeDecisionVisee,
-    -- Comptes rendus (Titre + Description)
+    -- Comptes rendus
     (
         SELECT STRING_AGG(
-            ISNULL(cr.grdf_titre, '') 
-                + CASE WHEN cr.grdf_description IS NOT NULL 
-                       THEN ' | ' + cr.grdf_description 
-                       ELSE '' 
+            ISNULL(cr.grdf_titre, '')
+                + CASE WHEN cr.grdf_description IS NOT NULL
+                       THEN ' | ' + cr.grdf_description
+                       ELSE ''
                   END,
             ' ;; '
         ) WITHIN GROUP (ORDER BY cr.grdf_titre)
@@ -127,12 +127,6 @@ LEFT JOIN dbo.StringMap AS sm_prio
     AND sm_prio.AttributeName   = 'prioritycode'
     AND sm_prio.AttributeValue  = app.PriorityCode
     AND sm_prio.LangId          = 1036
-WHERE app.ActivityId IN (
-    '93e62a73-0143-f111-8141-005056be5b03',
-    '3b2803ca-c72d-f111-8144-005056be1732',
-    '92512192-4aed-f011-813d-005056beef00',
-	'93140e6c-322f-f111-813f-005056be7218'
-)
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
@@ -148,4 +142,3 @@ GROUP BY
     app.ActualDurationMinutes,
     app.grdf_thematique,
     app.grdf_type_decision_vise
-
