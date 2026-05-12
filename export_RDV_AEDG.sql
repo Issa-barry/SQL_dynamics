@@ -11,7 +11,7 @@ SELECT
     MAX(sm_reason.Value)                AS RaisonStatut,
     -- Participants obligatoires (ParticipationTypeMask = 5)
     (
-        SELECT STRING_AGG(ap.PartyIdName, ', ')
+        SELECT STRING_AGG(CAST(ap.PartyIdName AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY ap.PartyIdName)
         FROM dbo.ActivityParty AS ap
         WHERE ap.ActivityId             = app.ActivityId
@@ -20,7 +20,7 @@ SELECT
     )                                   AS Participants,
     -- Participants facultatifs (ParticipationTypeMask = 6)
     (
-        SELECT STRING_AGG(ap.PartyIdName, ', ')
+        SELECT STRING_AGG(CAST(ap.PartyIdName AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY ap.PartyIdName)
         FROM dbo.ActivityParty AS ap
         WHERE ap.ActivityId             = app.ActivityId
@@ -65,7 +65,7 @@ SELECT
     MAX(sm_prio.Value)                  AS Priorite,
     -- Thématiques
     (
-        SELECT STRING_AGG(sm_them.Value, ', ')
+        SELECT STRING_AGG(CAST(sm_them.Value AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY sm_them.Value)
         FROM dbo.StringMap AS sm_them
         WHERE sm_them.ObjectTypeCode    = 4201
@@ -78,7 +78,7 @@ SELECT
     )                                   AS Thematiques,
     -- HATVP Type de décision visée
     (
-        SELECT STRING_AGG(sm_dec.Value, ', ')
+        SELECT STRING_AGG(CAST(sm_dec.Value AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY sm_dec.Value)
         FROM dbo.StringMap AS sm_dec
         WHERE sm_dec.ObjectTypeCode     = 4201
@@ -92,11 +92,13 @@ SELECT
     -- Comptes rendus
     (
         SELECT STRING_AGG(
-            ISNULL(cr.grdf_titre, '')
-                + CASE WHEN cr.grdf_description IS NOT NULL
-                       THEN ' | ' + cr.grdf_description
-                       ELSE ''
-                  END,
+            CAST(
+                ISNULL(cr.grdf_titre, '')
+                    + CASE WHEN cr.grdf_description IS NOT NULL
+                           THEN ' | ' + cr.grdf_description
+                           ELSE ''
+                      END
+            AS NVARCHAR(MAX)),
             ' ;; '
         ) WITHIN GROUP (ORDER BY cr.grdf_titre)
         FROM dbo.grdf_compte_rendu AS cr
