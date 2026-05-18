@@ -1,6 +1,6 @@
 SELECT
     app.ActivityId,
-    app.grdf_hatvp                          AS RDV_hatvp,
+    app.grdf_hatvp                      AS RDV_hatvp,
     app.Subject                         AS Libelle,
     app.OwnerIdName                     AS Proprietaire,
     app.Description,
@@ -110,7 +110,6 @@ SELECT
     MAX(sm_empl.Value)                  AS grdf_emplacement,
     app.Location                        AS Lieu,
     MAX(sm_stat.Value)                  AS Statut,
-    MAX(sm_reason.Value)                AS RaisonStatut,
     -- Participants obligatoires (ParticipationTypeMask = 5)
     (
         SELECT STRING_AGG(
@@ -218,8 +217,7 @@ SELECT
         ) / 60.0
     AS DECIMAL(5,1))                    AS Duree_Heures,
     MAX(sm_type.Value)                  AS grdf_Type,
-    MAX(sm_prio.Value)                  AS Priorite,
-    -- Thématiques
+    -- Thématiques (juste après grdf_Type)
     (
         SELECT STRING_AGG(CAST(sm_them.Value AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY sm_them.Value)
@@ -232,6 +230,7 @@ SELECT
               ) > 0
           AND sm_them.LangId            = 1036
     )                                   AS Thematiques,
+    MAX(sm_prio.Value)                  AS Priorite,
     -- HATVP Type de décision visée
     (
         SELECT STRING_AGG(CAST(sm_dec.Value AS NVARCHAR(MAX)), ', ')
@@ -266,11 +265,6 @@ LEFT JOIN dbo.StringMap AS sm_stat
     AND sm_stat.AttributeName   = 'statecode'
     AND sm_stat.AttributeValue  = app.StateCode
     AND sm_stat.LangId          = 1036
-LEFT JOIN dbo.StringMap AS sm_reason
-    ON  sm_reason.ObjectTypeCode = 4201
-    AND sm_reason.AttributeName  = 'statuscode'
-    AND sm_reason.AttributeValue = app.StatusCode
-    AND sm_reason.LangId         = 1036
 LEFT JOIN dbo.StringMap AS sm_type
     ON  sm_type.ObjectTypeCode  = 4201
     AND sm_type.AttributeName   = 'grdf_type'
