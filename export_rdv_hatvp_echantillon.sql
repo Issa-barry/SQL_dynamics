@@ -1,6 +1,6 @@
 SELECT
     app.ActivityId,
-    app.grdf_hatvp,
+    app.grdf_hatvp                          AS RDV_hatvp,
     app.Subject                         AS Libelle,
     app.OwnerIdName                     AS Proprietaire,
     app.Description,
@@ -35,6 +35,78 @@ SELECT
         WHEN app.RegardingObjectTypeCode = 4 THEN 'Opportunité'
         ELSE CAST(app.RegardingObjectTypeCode AS NVARCHAR(50))
     END                                 AS TypeConcernant,
+    -- Référence Atout Prisca du compte rattaché
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+        (
+            SELECT a.grdf_reference_atoutprisca
+            FROM dbo.Account AS a
+            WHERE a.AccountId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT a.grdf_reference_atoutprisca
+            FROM dbo.Contact AS c
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = c.AccountId
+            WHERE c.ContactId = app.RegardingObjectId
+        )
+        ELSE NULL
+    END                                 AS RefAtoutPrisca,
+    -- Code INSEE du compte rattaché
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+        (
+            SELECT a.grdf_code_insee
+            FROM dbo.Account AS a
+            WHERE a.AccountId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT a.grdf_code_insee
+            FROM dbo.Contact AS c
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = c.AccountId
+            WHERE c.ContactId = app.RegardingObjectId
+        )
+        ELSE NULL
+    END                                 AS CodeINSEE,
+    -- SIRET du compte rattaché
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+        (
+            SELECT a.grdf_siret
+            FROM dbo.Account AS a
+            WHERE a.AccountId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT a.grdf_siret
+            FROM dbo.Contact AS c
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = c.AccountId
+            WHERE c.ContactId = app.RegardingObjectId
+        )
+        ELSE NULL
+    END                                 AS CodeSIRET,
+    -- Code SIREN du compte rattaché (9 premiers caractères du SIRET)
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+        (
+            SELECT LEFT(a.grdf_siret, 9)
+            FROM dbo.Account AS a
+            WHERE a.AccountId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT LEFT(a.grdf_siret, 9)
+            FROM dbo.Contact AS c
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = c.AccountId
+            WHERE c.ContactId = app.RegardingObjectId
+        )
+        ELSE NULL
+    END                                 AS CodeSIREN,
     MAX(sm_empl.Value)                  AS grdf_emplacement,
     app.Location                        AS Lieu,
     MAX(sm_stat.Value)                  AS Statut,
@@ -233,7 +305,7 @@ WHERE app.CreatedOn >= '2023-01-01'
     '93e62a73-0143-f111-8141-005056be5b03',
     '3b2803ca-c72d-f111-8144-005056be1732',
     '92512192-4aed-f011-813d-005056beef00'
- )
+)
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
