@@ -28,6 +28,13 @@ SELECT
         )
         ELSE app.RegardingObjectIdName
     END                                 AS Concernant,
+    -- Type du concernant
+    CASE
+        WHEN app.RegardingObjectTypeCode = 2 THEN 'Contact'
+        WHEN app.RegardingObjectTypeCode = 1 THEN 'Compte'
+        WHEN app.RegardingObjectTypeCode = 4 THEN 'Opportunité'
+        ELSE CAST(app.RegardingObjectTypeCode AS NVARCHAR(50))
+    END                                 AS TypeConcernant,
     MAX(sm_empl.Value)                  AS grdf_emplacement,
     app.Location                        AS Lieu,
     MAX(sm_stat.Value)                  AS Statut,
@@ -202,7 +209,6 @@ LEFT JOIN dbo.StringMap AS sm_prio
     AND sm_prio.AttributeName   = 'prioritycode'
     AND sm_prio.AttributeValue  = app.PriorityCode
     AND sm_prio.LangId          = 1036
--- Jointure Emplacement
 LEFT JOIN dbo.StringMap AS sm_empl
     ON  sm_empl.ObjectTypeCode  = 4201
     AND sm_empl.AttributeName   = 'grdf_emplacement'
@@ -227,7 +233,7 @@ WHERE app.CreatedOn >= '2023-01-01'
     '93e62a73-0143-f111-8141-005056be5b03',
     '3b2803ca-c72d-f111-8144-005056be1732',
     '92512192-4aed-f011-813d-005056beef00'
-)
+ )
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
