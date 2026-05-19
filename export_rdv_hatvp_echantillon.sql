@@ -30,9 +30,10 @@ SELECT
     END                                 AS Concernant,
     -- Type du concernant
     CASE
-        WHEN app.RegardingObjectTypeCode = 2 THEN 'Contact'
-        WHEN app.RegardingObjectTypeCode = 1 THEN 'Compte'
-        WHEN app.RegardingObjectTypeCode = 4 THEN 'Opportunité'
+        WHEN app.RegardingObjectTypeCode = 2    THEN 'Contact'
+        WHEN app.RegardingObjectTypeCode = 1    THEN 'Compte'
+        WHEN app.RegardingObjectTypeCode = 4    THEN 'Opportunité'
+        WHEN app.RegardingObjectTypeCode = 4400 THEN 'Campagne'
         ELSE CAST(app.RegardingObjectTypeCode AS NVARCHAR(50))
     END                                 AS TypeConcernant,
     -- Référence Atout Prisca du compte rattaché
@@ -53,17 +54,17 @@ SELECT
         )
         ELSE NULL
     END                                 AS RefAtoutPrisca,
-    -- Code INSEE du compte rattaché
+    -- Code INSEE du compte rattaché (5 caractères, zéros de tête préservés)
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
         (
-            SELECT a.grdf_code_insee
+            SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5)
             FROM dbo.Account AS a
             WHERE a.AccountId = app.RegardingObjectId
         )
         WHEN app.RegardingObjectTypeCode = 2 THEN
         (
-            SELECT a.grdf_code_insee
+            SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5)
             FROM dbo.Contact AS c
             INNER JOIN dbo.Account AS a
                 ON  a.AccountId = c.AccountId
@@ -71,17 +72,17 @@ SELECT
         )
         ELSE NULL
     END                                 AS CodeINSEE,
-    -- SIRET du compte rattaché
+    -- SIRET du compte rattaché (14 caractères, zéros de tête préservés)
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
         (
-            SELECT a.grdf_siret
+            SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14)
             FROM dbo.Account AS a
             WHERE a.AccountId = app.RegardingObjectId
         )
         WHEN app.RegardingObjectTypeCode = 2 THEN
         (
-            SELECT a.grdf_siret
+            SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14)
             FROM dbo.Contact AS c
             INNER JOIN dbo.Account AS a
                 ON  a.AccountId = c.AccountId
@@ -89,17 +90,17 @@ SELECT
         )
         ELSE NULL
     END                                 AS CodeSIRET,
-    -- Code SIREN du compte rattaché (9 premiers caractères du SIRET)
+    -- Code SIREN du compte rattaché (9 caractères, zéros de tête préservés)
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
         (
-            SELECT LEFT(a.grdf_siret, 9)
+            SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9)
             FROM dbo.Account AS a
             WHERE a.AccountId = app.RegardingObjectId
         )
         WHEN app.RegardingObjectTypeCode = 2 THEN
         (
-            SELECT LEFT(a.grdf_siret, 9)
+            SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9)
             FROM dbo.Contact AS c
             INNER JOIN dbo.Account AS a
                 ON  a.AccountId = c.AccountId
@@ -110,7 +111,72 @@ SELECT
     MAX(sm_empl.Value)                  AS grdf_emplacement,
     app.Location                        AS Lieu,
     MAX(sm_stat.Value)                  AS Statut,
-    -- Participants obligatoires (ParticipationTypeMask = 5)
+    -- Participants internes GRDF
+    -- (mail @grdf.fr  OU  SystemUser = toujours interne) - max 5
+    (
+        SELECT STRING_AGG(
+            CAST(
+                ISNULL(
+                    CASE
+                        WHEN ap.PartyObjectTypeCode = 8
+                        THEN su.LastName
+                        ELSE c.LastName
+                    END,
+                    ap.PartyIdName
+                ) + ' | ' +
+                ISNULL(
+                    CASE
+                        WHEN ap.PartyObjectTypeCode = 8
+                        THEN su.FirstName
+                        ELSE c.FirstName
+                    END,
+                    '-'
+                ) + ' | ' +
+                ISNULL(sm_fonc.Value, '-')
+            AS NVARCHAR(MAX)), ' ; ')
+            WITHIN GROUP (ORDER BY
+                CASE WHEN ap.PartyObjectTypeCode = 8 THEN su.LastName  ELSE c.LastName  END,
+                CASE WHEN ap.PartyObjectTypeCode = 8 THEN su.FirstName ELSE c.FirstName END
+            )
+        FROM (
+            SELECT TOP 5
+                ap.PartyIdName,
+                ap.ActivityId,
+                ap.PartyId,
+                ap.PartyObjectTypeCode
+            FROM dbo.ActivityParty AS ap
+            LEFT JOIN dbo.Contact    AS c2
+                ON  c2.ContactId          = ap.PartyId
+                AND ap.PartyObjectTypeCode = 2
+            LEFT JOIN dbo.SystemUser AS su2
+                ON  su2.SystemUserId       = ap.PartyId
+                AND ap.PartyObjectTypeCode = 8
+            WHERE ap.ActivityId            = app.ActivityId
+              AND ap.ParticipationTypeMask IN (5, 6)
+              AND ap.IsPartyDeleted        = 0
+              AND (
+                    ap.PartyObjectTypeCode = 8                          -- SystemUser = toujours interne
+                    OR (ap.PartyObjectTypeCode = 2
+                        AND c2.EMailAddress1 LIKE '%@grdf.fr')          -- Contact avec mail grdf
+                  )
+            ORDER BY
+                CASE WHEN ap.PartyObjectTypeCode = 8 THEN su2.LastName  ELSE c2.LastName  END,
+                CASE WHEN ap.PartyObjectTypeCode = 8 THEN su2.FirstName ELSE c2.FirstName END
+        ) AS ap
+        LEFT JOIN dbo.Contact    AS c
+            ON  c.ContactId          = ap.PartyId
+            AND ap.PartyObjectTypeCode = 2
+        LEFT JOIN dbo.SystemUser AS su
+            ON  su.SystemUserId       = ap.PartyId
+            AND ap.PartyObjectTypeCode = 8
+        LEFT JOIN dbo.StringMap  AS sm_fonc
+            ON  sm_fonc.ObjectTypeCode = 2
+            AND sm_fonc.AttributeName  = 'grdf_fonction'
+            AND sm_fonc.AttributeValue = c.grdf_fonction
+            AND sm_fonc.LangId         = 1036
+    )                                   AS Participants_Internes,
+    -- Participants externes
+    -- (Contact avec mail non @grdf.fr ou mail vide) - max 15
     (
         SELECT STRING_AGG(
             CAST(
@@ -119,39 +185,35 @@ SELECT
                 ISNULL(sm_fonc.Value, '-')
             AS NVARCHAR(MAX)), ' ; ')
             WITHIN GROUP (ORDER BY c.LastName, c.FirstName)
-        FROM dbo.ActivityParty AS ap
+        FROM (
+            SELECT TOP 15
+                ap.PartyIdName,
+                ap.ActivityId,
+                ap.PartyId,
+                ap.PartyObjectTypeCode,
+                c2.LastName,
+                c2.FirstName,
+                c2.grdf_fonction
+            FROM dbo.ActivityParty AS ap
+            LEFT JOIN dbo.Contact AS c2
+                ON  c2.ContactId          = ap.PartyId
+                AND ap.PartyObjectTypeCode = 2
+            WHERE ap.ActivityId            = app.ActivityId
+              AND ap.ParticipationTypeMask IN (5, 6)
+              AND ap.IsPartyDeleted        = 0
+              AND ap.PartyObjectTypeCode   = 2          -- uniquement les Contacts
+              AND (c2.EMailAddress1 IS NULL
+                   OR c2.EMailAddress1 NOT LIKE '%@grdf.fr')
+            ORDER BY c2.LastName, c2.FirstName
+        ) AS ap
         LEFT JOIN dbo.Contact AS c
-            ON  c.ContactId            = ap.PartyId
+            ON  c.ContactId = ap.PartyId
         LEFT JOIN dbo.StringMap AS sm_fonc
             ON  sm_fonc.ObjectTypeCode = 2
             AND sm_fonc.AttributeName  = 'grdf_fonction'
-            AND sm_fonc.AttributeValue = c.grdf_fonction
+            AND sm_fonc.AttributeValue = ap.grdf_fonction
             AND sm_fonc.LangId         = 1036
-        WHERE ap.ActivityId            = app.ActivityId
-          AND ap.ParticipationTypeMask = 5
-          AND ap.IsPartyDeleted        = 0
-    )                                   AS Participants,
-    -- Participants facultatifs (ParticipationTypeMask = 6)
-    (
-        SELECT STRING_AGG(
-            CAST(
-                ISNULL(c.LastName,  ap.PartyIdName) + ' | ' +
-                ISNULL(c.FirstName, '-')             + ' | ' +
-                ISNULL(sm_fonc.Value, '-')
-            AS NVARCHAR(MAX)), ' ; ')
-            WITHIN GROUP (ORDER BY c.LastName, c.FirstName)
-        FROM dbo.ActivityParty AS ap
-        LEFT JOIN dbo.Contact AS c
-            ON  c.ContactId            = ap.PartyId
-        LEFT JOIN dbo.StringMap AS sm_fonc
-            ON  sm_fonc.ObjectTypeCode = 2
-            AND sm_fonc.AttributeName  = 'grdf_fonction'
-            AND sm_fonc.AttributeValue = c.grdf_fonction
-            AND sm_fonc.LangId         = 1036
-        WHERE ap.ActivityId            = app.ActivityId
-          AND ap.ParticipationTypeMask = 6
-          AND ap.IsPartyDeleted        = 0
-    )                                   AS Facultatifs,
+    )                                   AS Participants_Externes,
     -- Nombre d'interlocuteurs HATVP
     (
         SELECT COUNT(DISTINCT contact_hatvp.ContactId)
@@ -182,42 +244,14 @@ SELECT
               AND app.RegardingObjectTypeCode = 2
         ) AS contact_hatvp
     )                                   AS NbInterlocuteursHATV,
-    -- Heure de début (UTC → Europe/Paris)
+    -- Date de début (UTC → Europe/Paris)
     CONVERT(DATE,
         app.ScheduledStart
             AT TIME ZONE 'UTC'
             AT TIME ZONE 'Romance Standard Time'
     )                                   AS HeureDebut_Date,
-    CONVERT(TIME(0),
-        app.ScheduledStart
-            AT TIME ZONE 'UTC'
-            AT TIME ZONE 'Romance Standard Time'
-    )                                   AS HeureDebut_Heure,
-    -- Heure de fin (UTC → Europe/Paris)
-    CONVERT(DATE,
-        app.ScheduledEnd
-            AT TIME ZONE 'UTC'
-            AT TIME ZONE 'Romance Standard Time'
-    )                                   AS HeureFin_Date,
-    CONVERT(TIME(0),
-        app.ScheduledEnd
-            AT TIME ZONE 'UTC'
-            AT TIME ZONE 'Romance Standard Time'
-    )                                   AS HeureFin_Heure,
-    -- Journée
-    CASE WHEN app.IsAllDayEvent = 1
-         THEN 'Oui'
-         ELSE 'Non'
-    END                                 AS Journee,
-    -- Durée
-    CAST(
-        COALESCE(
-            app.ActualDurationMinutes,
-            DATEDIFF(MINUTE, app.ScheduledStart, app.ScheduledEnd)
-        ) / 60.0
-    AS DECIMAL(5,1))                    AS Duree_Heures,
     MAX(sm_type.Value)                  AS grdf_Type,
-    -- Thématiques (juste après grdf_Type)
+    -- Thématiques
     (
         SELECT STRING_AGG(CAST(sm_them.Value AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY sm_them.Value)
@@ -243,22 +277,7 @@ SELECT
                 app.grdf_type_decision_vise
               ) > 0
           AND sm_dec.LangId             = 1036
-    )                                   AS HATVP_TypeDecisionVisee,
-    -- Comptes rendus
-    (
-        SELECT STRING_AGG(
-            CAST(
-                ISNULL(cr.grdf_titre, '')
-                    + CASE WHEN cr.grdf_description IS NOT NULL
-                           THEN ' | ' + cr.grdf_description
-                           ELSE ''
-                      END
-            AS NVARCHAR(MAX)),
-            ' ;; '
-        ) WITHIN GROUP (ORDER BY cr.grdf_titre)
-        FROM dbo.grdf_compte_rendu AS cr
-        WHERE cr.grdf_rendez_vousid = app.ActivityId
-    )                                   AS ComptesRendus
+    )                                   AS HATVP_TypeDecisionVisee
 FROM dbo.Appointment AS app
 LEFT JOIN dbo.StringMap AS sm_stat
     ON  sm_stat.ObjectTypeCode  = 4201
@@ -298,8 +317,8 @@ WHERE app.CreatedOn >= '2023-01-01'
   AND app.ActivityId IN (
     '93e62a73-0143-f111-8141-005056be5b03',
     '3b2803ca-c72d-f111-8144-005056be1732',
-    '92512192-4aed-f011-813d-005056beef00'
-)
+    '92512192-4aed-f011-813d-005056beef00',
+    'e7eeaaca-5aed-f011-8140-005056be8b27')
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
