@@ -27,6 +27,31 @@ SELECT
         )
         ELSE app.RegardingObjectIdName
     END                                 AS Concernant,
+    -- Compte rattaché au concernant
+    CASE
+        -- Concernant = Compte : vide
+        WHEN app.RegardingObjectTypeCode = 1 THEN NULL
+        -- Concernant = Contact : compte du contact
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT a.Name
+            FROM dbo.Contact AS c
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = c.AccountId
+            WHERE c.ContactId = app.RegardingObjectId
+        )
+        -- Concernant = Opportunité : compte de l'opportunité
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT a.Name
+            FROM dbo.Opportunity AS o
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = o.AccountId
+            WHERE o.OpportunityId = app.RegardingObjectId
+        )
+        -- Concernant = Campagne ou autre : vide
+        ELSE NULL
+    END                                 AS CompteRattache,
     -- Type du concernant
     CASE
         WHEN app.RegardingObjectTypeCode = 2    THEN 'Contact'
@@ -318,7 +343,8 @@ WHERE app.CreatedOn >= '2023-01-01'
     '93e62a73-0143-f111-8141-005056be5b03',
     '3b2803ca-c72d-f111-8144-005056be1732',
     '92512192-4aed-f011-813d-005056beef00',
-    'e7eeaaca-5aed-f011-8140-005056be8b27')
+    'e7eeaaca-5aed-f011-8140-005056be8b27',
+	'6331C265-60F0-F011-813A-005056BE5B03')
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
@@ -335,5 +361,3 @@ GROUP BY
     app.ActualDurationMinutes,
     app.grdf_thematique,
     app.grdf_type_decision_vise;
-
- 
