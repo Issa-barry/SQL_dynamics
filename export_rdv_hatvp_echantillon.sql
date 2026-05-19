@@ -2,7 +2,6 @@ SELECT
     app.ActivityId,
     app.grdf_hatvp                      AS RDV_hatvp,
     app.Subject                         AS Libelle,
-    app.OwnerIdName                     AS Proprietaire,
     app.Description,
     -- Concernant : Nom | Prénom | Fonction
     CASE
@@ -111,23 +110,22 @@ SELECT
     MAX(sm_empl.Value)                  AS grdf_emplacement,
     app.Location                        AS Lieu,
     MAX(sm_stat.Value)                  AS Statut,
+    app.OwnerIdName                     AS Proprietaire,
     -- Participants internes GRDF
-    -- (mail @grdf.fr  OU  SystemUser = toujours interne) - max 5
+    -- (SystemUser = toujours interne, Contact avec mail @grdf.fr) - max 5
     (
         SELECT STRING_AGG(
             CAST(
                 ISNULL(
                     CASE
-                        WHEN ap.PartyObjectTypeCode = 8
-                        THEN su.LastName
+                        WHEN ap.PartyObjectTypeCode = 8 THEN su.LastName
                         ELSE c.LastName
                     END,
                     ap.PartyIdName
                 ) + ' | ' +
                 ISNULL(
                     CASE
-                        WHEN ap.PartyObjectTypeCode = 8
-                        THEN su.FirstName
+                        WHEN ap.PartyObjectTypeCode = 8 THEN su.FirstName
                         ELSE c.FirstName
                     END,
                     '-'
@@ -155,19 +153,19 @@ SELECT
               AND ap.ParticipationTypeMask IN (5, 6)
               AND ap.IsPartyDeleted        = 0
               AND (
-                    ap.PartyObjectTypeCode = 8                          -- SystemUser = toujours interne
+                    ap.PartyObjectTypeCode = 8
                     OR (ap.PartyObjectTypeCode = 2
-                        AND c2.EMailAddress1 LIKE '%@grdf.fr')          -- Contact avec mail grdf
+                        AND c2.EMailAddress1 LIKE '%@grdf.fr')
                   )
             ORDER BY
                 CASE WHEN ap.PartyObjectTypeCode = 8 THEN su2.LastName  ELSE c2.LastName  END,
                 CASE WHEN ap.PartyObjectTypeCode = 8 THEN su2.FirstName ELSE c2.FirstName END
         ) AS ap
         LEFT JOIN dbo.Contact    AS c
-            ON  c.ContactId          = ap.PartyId
+            ON  c.ContactId           = ap.PartyId
             AND ap.PartyObjectTypeCode = 2
         LEFT JOIN dbo.SystemUser AS su
-            ON  su.SystemUserId       = ap.PartyId
+            ON  su.SystemUserId        = ap.PartyId
             AND ap.PartyObjectTypeCode = 8
         LEFT JOIN dbo.StringMap  AS sm_fonc
             ON  sm_fonc.ObjectTypeCode = 2
@@ -177,12 +175,14 @@ SELECT
     )                                   AS Participants_Internes,
     -- Participants externes
     -- (Contact avec mail non @grdf.fr ou mail vide) - max 15
+    -- Format : Nom | Prénom | Fonction | HATVP
     (
         SELECT STRING_AGG(
             CAST(
                 ISNULL(c.LastName,  ap.PartyIdName) + ' | ' +
                 ISNULL(c.FirstName, '-')             + ' | ' +
-                ISNULL(sm_fonc.Value, '-')
+                ISNULL(sm_fonc.Value, '-')           + ' | ' +
+                CASE WHEN c.grdf_hatvp = 1 THEN 'Oui' ELSE 'Non' END
             AS NVARCHAR(MAX)), ' ; ')
             WITHIN GROUP (ORDER BY c.LastName, c.FirstName)
         FROM (
@@ -201,7 +201,7 @@ SELECT
             WHERE ap.ActivityId            = app.ActivityId
               AND ap.ParticipationTypeMask IN (5, 6)
               AND ap.IsPartyDeleted        = 0
-              AND ap.PartyObjectTypeCode   = 2          -- uniquement les Contacts
+              AND ap.PartyObjectTypeCode   = 2
               AND (c2.EMailAddress1 IS NULL
                    OR c2.EMailAddress1 NOT LIKE '%@grdf.fr')
             ORDER BY c2.LastName, c2.FirstName
@@ -335,3 +335,5 @@ GROUP BY
     app.ActualDurationMinutes,
     app.grdf_thematique,
     app.grdf_type_decision_vise;
+
+ 
