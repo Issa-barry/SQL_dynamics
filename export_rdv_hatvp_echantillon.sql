@@ -25,13 +25,23 @@ SELECT
             FROM dbo.Account AS a
             WHERE a.AccountId = app.RegardingObjectId
         )
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT o.Name
+            FROM dbo.Opportunity AS o
+            WHERE o.OpportunityId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT l.Subject
+            FROM dbo.Lead AS l
+            WHERE l.LeadId = app.RegardingObjectId
+        )
         ELSE app.RegardingObjectIdName
     END                                 AS Concernant,
     -- Compte rattaché au concernant
     CASE
-        -- Concernant = Compte : vide
         WHEN app.RegardingObjectTypeCode = 1 THEN NULL
-        -- Concernant = Contact : compte du contact
         WHEN app.RegardingObjectTypeCode = 2 THEN
         (
             SELECT a.Name
@@ -40,8 +50,7 @@ SELECT
                 ON  a.AccountId = c.AccountId
             WHERE c.ContactId = app.RegardingObjectId
         )
-        -- Concernant = Opportunité : compte de l'opportunité
-        WHEN app.RegardingObjectTypeCode = 4 THEN
+        WHEN app.RegardingObjectTypeCode = 3 THEN
         (
             SELECT a.Name
             FROM dbo.Opportunity AS o
@@ -49,17 +58,59 @@ SELECT
                 ON  a.AccountId = o.AccountId
             WHERE o.OpportunityId = app.RegardingObjectId
         )
-        -- Concernant = Campagne ou autre : vide
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT a.Name
+            FROM dbo.Lead AS l
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = l.AccountId
+            WHERE l.LeadId = app.RegardingObjectId
+        )
         ELSE NULL
     END                                 AS CompteRattache,
     -- Type du concernant
     CASE
         WHEN app.RegardingObjectTypeCode = 2    THEN 'Contact'
         WHEN app.RegardingObjectTypeCode = 1    THEN 'Compte'
-        WHEN app.RegardingObjectTypeCode = 4    THEN 'Opportunité'
+        WHEN app.RegardingObjectTypeCode = 3    THEN 'Opportunité'
+        WHEN app.RegardingObjectTypeCode = 4    THEN 'Lead'
         WHEN app.RegardingObjectTypeCode = 4400 THEN 'Campagne'
         ELSE CAST(app.RegardingObjectTypeCode AS NVARCHAR(50))
     END                                 AS TypeConcernant,
+    -- Référence compte (grdf_reference) du compte rattaché
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+        (
+            SELECT a.grdf_reference
+            FROM dbo.Account AS a
+            WHERE a.AccountId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT a.grdf_reference
+            FROM dbo.Contact AS c
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = c.AccountId
+            WHERE c.ContactId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT a.grdf_reference
+            FROM dbo.Opportunity AS o
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = o.AccountId
+            WHERE o.OpportunityId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT a.grdf_reference
+            FROM dbo.Lead AS l
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = l.AccountId
+            WHERE l.LeadId = app.RegardingObjectId
+        )
+        ELSE NULL
+    END                                 AS RefCompte,
     -- Référence Atout Prisca du compte rattaché
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
@@ -75,6 +126,22 @@ SELECT
             INNER JOIN dbo.Account AS a
                 ON  a.AccountId = c.AccountId
             WHERE c.ContactId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT a.grdf_reference_atoutprisca
+            FROM dbo.Opportunity AS o
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = o.AccountId
+            WHERE o.OpportunityId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT a.grdf_reference_atoutprisca
+            FROM dbo.Lead AS l
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = l.AccountId
+            WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
     END                                 AS RefAtoutPrisca,
@@ -94,6 +161,22 @@ SELECT
                 ON  a.AccountId = c.AccountId
             WHERE c.ContactId = app.RegardingObjectId
         )
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5)
+            FROM dbo.Opportunity AS o
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = o.AccountId
+            WHERE o.OpportunityId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5)
+            FROM dbo.Lead AS l
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = l.AccountId
+            WHERE l.LeadId = app.RegardingObjectId
+        )
         ELSE NULL
     END                                 AS CodeINSEE,
     -- SIRET du compte rattaché (14 caractères, zéros de tête préservés)
@@ -112,6 +195,22 @@ SELECT
                 ON  a.AccountId = c.AccountId
             WHERE c.ContactId = app.RegardingObjectId
         )
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14)
+            FROM dbo.Opportunity AS o
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = o.AccountId
+            WHERE o.OpportunityId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14)
+            FROM dbo.Lead AS l
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = l.AccountId
+            WHERE l.LeadId = app.RegardingObjectId
+        )
         ELSE NULL
     END                                 AS CodeSIRET,
     -- Code SIREN du compte rattaché (9 caractères, zéros de tête préservés)
@@ -129,6 +228,22 @@ SELECT
             INNER JOIN dbo.Account AS a
                 ON  a.AccountId = c.AccountId
             WHERE c.ContactId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9)
+            FROM dbo.Opportunity AS o
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = o.AccountId
+            WHERE o.OpportunityId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9)
+            FROM dbo.Lead AS l
+            INNER JOIN dbo.Account AS a
+                ON  a.AccountId = l.AccountId
+            WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
     END                                 AS CodeSIREN,
@@ -344,7 +459,9 @@ WHERE app.CreatedOn >= '2023-01-01'
     '3b2803ca-c72d-f111-8144-005056be1732',
     '92512192-4aed-f011-813d-005056beef00',
     'e7eeaaca-5aed-f011-8140-005056be8b27',
-	'6331C265-60F0-F011-813A-005056BE5B03')
+    '6331C265-60F0-F011-813A-005056BE5B03',
+    'D5AA6FF8-3D2C-F111-8144-005056BE8B27'
+  )
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
