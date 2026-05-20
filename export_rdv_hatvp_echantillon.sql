@@ -63,7 +63,7 @@ SELECT
             SELECT a.Name
             FROM dbo.Lead AS l
             INNER JOIN dbo.Account AS a
-                ON  a.AccountId = l.AccountId
+                ON  a.AccountId = l.ParentAccountId
             WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
@@ -106,7 +106,7 @@ SELECT
             SELECT a.grdf_reference
             FROM dbo.Lead AS l
             INNER JOIN dbo.Account AS a
-                ON  a.AccountId = l.AccountId
+                ON  a.AccountId = l.ParentAccountId
             WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
@@ -140,7 +140,7 @@ SELECT
             SELECT a.grdf_reference_atoutprisca
             FROM dbo.Lead AS l
             INNER JOIN dbo.Account AS a
-                ON  a.AccountId = l.AccountId
+                ON  a.AccountId = l.ParentAccountId
             WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
@@ -174,7 +174,7 @@ SELECT
             SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5)
             FROM dbo.Lead AS l
             INNER JOIN dbo.Account AS a
-                ON  a.AccountId = l.AccountId
+                ON  a.AccountId = l.ParentAccountId
             WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
@@ -208,7 +208,7 @@ SELECT
             SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14)
             FROM dbo.Lead AS l
             INNER JOIN dbo.Account AS a
-                ON  a.AccountId = l.AccountId
+                ON  a.AccountId = l.ParentAccountId
             WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
@@ -242,7 +242,7 @@ SELECT
             SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9)
             FROM dbo.Lead AS l
             INNER JOIN dbo.Account AS a
-                ON  a.AccountId = l.AccountId
+                ON  a.AccountId = l.ParentAccountId
             WHERE l.LeadId = app.RegardingObjectId
         )
         ELSE NULL
@@ -252,7 +252,6 @@ SELECT
     MAX(sm_stat.Value)                  AS Statut,
     app.OwnerIdName                     AS Proprietaire,
     -- Participants internes GRDF
-    -- (SystemUser = toujours interne, Contact avec mail @grdf.fr) - max 5
     (
         SELECT STRING_AGG(
             CAST(
@@ -314,8 +313,6 @@ SELECT
             AND sm_fonc.LangId         = 1036
     )                                   AS Participants_Internes,
     -- Participants externes
-    -- (Contact avec mail non @grdf.fr ou mail vide) - max 15
-    -- Format : Nom | Prénom | Fonction | HATVP
     (
         SELECT STRING_AGG(
             CAST(
@@ -460,7 +457,8 @@ WHERE app.CreatedOn >= '2023-01-01'
     '92512192-4aed-f011-813d-005056beef00',
     'e7eeaaca-5aed-f011-8140-005056be8b27',
     '6331C265-60F0-F011-813A-005056BE5B03',
-    'D5AA6FF8-3D2C-F111-8144-005056BE8B27'
+    'D5AA6FF8-3D2C-F111-8144-005056BE8B27',
+    '2BF36B3E-E7A5-F011-813A-005056BE8B27'
   )
 GROUP BY
     app.ActivityId,
