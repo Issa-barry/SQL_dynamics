@@ -1,0 +1,89 @@
+
+SELECT
+
+    -- ID du lead
+    l.LeadId                                        AS [Lead_Id],
+
+    -- Date de création (sans heure)
+    CONVERT(DATE,
+        l.createdon AT TIME ZONE 'UTC'
+                    AT TIME ZONE 'Romance Standard Time')  AS [Date_Creation],
+
+    -- Canal de détection
+    ISNULL(sm_canal.Value, '')                      AS [Canal_Detection],
+
+    -- Agence
+    ISNULL(l.grdf_AgenceidName, '')                 AS [Agence],
+
+    -- Propriétaire du lead
+    ISNULL(l.OwnerIdName, '')                       AS [Proprietaire],
+
+    -- Segment marché
+    ISNULL(sm_segment.Value, '')                    AS [Segment_Marche],
+
+    -- Segment de Dev
+    ISNULL(sm_segdev.Value, '')                     AS [Segment_Dev],
+
+    -- Sous segment de Dev
+    ISNULL(sm_sousdev.Value, '')                    AS [Sous_Segment_Dev],
+
+    -- Fidélisation
+    ISNULL(sm_fidel.Value, '')                      AS [Fidelisation],
+
+    -- Nom du projet associé
+    ISNULL(opp.Name, '')                            AS [Nom_Projet],
+
+    -- Référence du projet
+    ISNULL(opp.grdf_reference, '')                  AS [Reference_Projet],
+
+    -- Statut du lead
+    ISNULL(sm_state.Value, '')                      AS [Statut]
+
+FROM Lead l
+
+    LEFT JOIN StringMap sm_canal
+        ON  sm_canal.ObjectTypeCode  = 4
+        AND sm_canal.AttributeName   = 'grdf_canal_de_detection'
+        AND sm_canal.AttributeValue  = l.grdf_Canal_de_detection
+        AND sm_canal.LangId          = 1036
+
+    LEFT JOIN StringMap sm_segment
+        ON  sm_segment.ObjectTypeCode = 4
+        AND sm_segment.AttributeName  = 'grdf_segment_marche'
+        AND sm_segment.AttributeValue = l.grdf_segment_marche
+        AND sm_segment.LangId         = 1036
+
+    LEFT JOIN StringMap sm_segdev
+        ON  sm_segdev.ObjectTypeCode = 4
+        AND sm_segdev.AttributeName  = 'grdf_segment_de_dev'
+        AND sm_segdev.AttributeValue = l.grdf_Segment_de_Dev
+        AND sm_segdev.LangId         = 1036
+
+    LEFT JOIN StringMap sm_sousdev
+        ON  sm_sousdev.ObjectTypeCode = 4
+        AND sm_sousdev.AttributeName  = 'grdf_sous_segment_dev'
+        AND sm_sousdev.AttributeValue = l.grdf_sous_segment_dev
+        AND sm_sousdev.LangId         = 1036
+
+    LEFT JOIN StringMap sm_fidel
+        ON  sm_fidel.ObjectTypeCode = 4
+        AND sm_fidel.AttributeName  = 'grdf_fidelisation'
+        AND sm_fidel.AttributeValue = l.grdf_Fidelisation
+        AND sm_fidel.LangId         = 1036
+
+    LEFT JOIN StringMap sm_state
+        ON  sm_state.ObjectTypeCode = 4
+        AND sm_state.AttributeName  = 'statecode'
+        AND sm_state.AttributeValue = l.StateCode
+        AND sm_state.LangId         = 1036
+
+    LEFT JOIN Opportunity opp
+        ON  opp.OriginatingLeadId = l.LeadId
+        AND opp.StateCode        <> 2
+
+WHERE
+    l.createdon >= '2025-01-01'
+    AND l.createdon <  '2027-01-01'
+
+ORDER BY
+    l.createdon DESC;
