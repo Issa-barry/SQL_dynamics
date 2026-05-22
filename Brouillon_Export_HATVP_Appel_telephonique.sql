@@ -22,38 +22,32 @@ SELECT
         )
         WHEN pc.RegardingObjectTypeCode = 1 THEN
         (
-            SELECT a.Name
-            FROM dbo.Account AS a
+            SELECT a.Name FROM dbo.Account AS a
             WHERE a.AccountId = pc.RegardingObjectId
         )
         WHEN pc.RegardingObjectTypeCode = 3 THEN
         (
-            SELECT o.Name
-            FROM dbo.Opportunity AS o
+            SELECT o.Name FROM dbo.Opportunity AS o
             WHERE o.OpportunityId = pc.RegardingObjectId
         )
         WHEN pc.RegardingObjectTypeCode = 4 THEN
         (
-            SELECT l.Subject
-            FROM dbo.Lead AS l
+            SELECT l.Subject FROM dbo.Lead AS l
             WHERE l.LeadId = pc.RegardingObjectId
         )
         WHEN pc.RegardingObjectTypeCode = 4402 THEN
         (
-            SELECT ca.Subject
-            FROM dbo.CampaignActivity AS ca
+            SELECT ca.Subject FROM dbo.CampaignActivity AS ca
             WHERE ca.ActivityId = pc.RegardingObjectId
         )
         WHEN pc.RegardingObjectTypeCode = 10118 THEN
         (
-            SELECT ct.grdf_name
-            FROM dbo.grdf_contrat AS ct
+            SELECT ct.grdf_name FROM dbo.grdf_contrat AS ct
             WHERE ct.grdf_contratId = pc.RegardingObjectId
         )
         WHEN pc.RegardingObjectTypeCode = 10121 THEN
         (
-            SELECT loc.grdf_nom
-            FROM dbo.grdf_local AS loc
+            SELECT loc.grdf_nom FROM dbo.grdf_local AS loc
             WHERE loc.grdf_localid = pc.RegardingObjectId
         )
         ELSE pc.RegardingObjectIdName
@@ -250,6 +244,39 @@ SELECT
           AND ap.ParticipationTypeMask = 2
           AND ap.IsPartyDeleted        = 0
     )                                   AS DestinationAppel,
+
+    -- Nombre d'interlocuteurs HATVP
+    (
+        SELECT COUNT(DISTINCT contact_hatvp.ContactId)
+        FROM (
+            -- Contacts HATVP en origine (mask = 1)
+            SELECT c.ContactId
+            FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c
+                ON  c.ContactId            = ap.PartyId
+                AND c.grdf_hatvp           = 1
+            WHERE ap.ActivityId            = pc.ActivityId
+              AND ap.ParticipationTypeMask = 1
+              AND ap.IsPartyDeleted        = 0
+            UNION
+            -- Contacts HATVP en destination (mask = 2)
+            SELECT c.ContactId
+            FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c
+                ON  c.ContactId            = ap.PartyId
+                AND c.grdf_hatvp           = 1
+            WHERE ap.ActivityId            = pc.ActivityId
+              AND ap.ParticipationTypeMask = 2
+              AND ap.IsPartyDeleted        = 0
+            UNION
+            -- Concernant direct si contact HATVP
+            SELECT c.ContactId
+            FROM dbo.Contact AS c
+            WHERE c.ContactId              = pc.RegardingObjectId
+              AND c.grdf_hatvp             = 1
+              AND pc.RegardingObjectTypeCode = 2
+        ) AS contact_hatvp
+    )                                   AS NbInterlocuteursHATV,
 
     -- Date planifiée (UTC → Europe/Paris)
     CONVERT(DATE,
