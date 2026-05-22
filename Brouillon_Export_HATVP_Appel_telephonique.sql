@@ -26,16 +26,178 @@ SELECT
             FROM dbo.Account AS a
             WHERE a.AccountId = pc.RegardingObjectId
         )
+        WHEN pc.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT o.Name
+            FROM dbo.Opportunity AS o
+            WHERE o.OpportunityId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT l.Subject
+            FROM dbo.Lead AS l
+            WHERE l.LeadId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 4402 THEN
+        (
+            SELECT ca.Subject
+            FROM dbo.CampaignActivity AS ca
+            WHERE ca.ActivityId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN
+        (
+            SELECT ct.grdf_name
+            FROM dbo.grdf_contrat AS ct
+            WHERE ct.grdf_contratId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN
+        (
+            SELECT loc.grdf_nom
+            FROM dbo.grdf_local AS loc
+            WHERE loc.grdf_localid = pc.RegardingObjectId
+        )
         ELSE pc.RegardingObjectIdName
     END                                 AS Concernant,
 
+    -- Compte rattaché au concernant
+    CASE
+        WHEN pc.RegardingObjectTypeCode = 1 THEN NULL
+        WHEN pc.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT a.Name FROM dbo.Contact AS c
+            INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId
+            WHERE c.ContactId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 3 THEN
+        (
+            SELECT a.Name FROM dbo.Opportunity AS o
+            INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId
+            WHERE o.OpportunityId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 4 THEN
+        (
+            SELECT a.Name FROM dbo.Lead AS l
+            INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId
+            WHERE l.LeadId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 4402 THEN
+        (
+            SELECT c.Name FROM dbo.CampaignActivity AS ca
+            INNER JOIN dbo.Campaign AS c ON c.CampaignId = ca.RegardingObjectId
+            WHERE ca.ActivityId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN
+        (
+            SELECT a.Name FROM dbo.grdf_contrat AS ct
+            INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte
+            WHERE ct.grdf_contratId = pc.RegardingObjectId
+        )
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN
+        (
+            SELECT a.Name FROM dbo.grdf_local AS loc
+            INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid
+            WHERE loc.grdf_localid = pc.RegardingObjectId
+        )
+        ELSE NULL
+    END                                 AS CompteRattache,
+
     -- Type du concernant
     CASE
-        WHEN pc.RegardingObjectTypeCode = 2 THEN 'Contact'
-        WHEN pc.RegardingObjectTypeCode = 1 THEN 'Compte'
-        WHEN pc.RegardingObjectTypeCode = 4 THEN 'Opportunité'
+        WHEN pc.RegardingObjectTypeCode = 2     THEN 'Contact'
+        WHEN pc.RegardingObjectTypeCode = 1     THEN 'Compte'
+        WHEN pc.RegardingObjectTypeCode = 3     THEN 'Projet'
+        WHEN pc.RegardingObjectTypeCode = 4     THEN 'Lead'
+        WHEN pc.RegardingObjectTypeCode = 4400  THEN 'Campagne'
+        WHEN pc.RegardingObjectTypeCode = 4402  THEN 'Activité de campagne'
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN 'Contrat'
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN 'Local'
         ELSE CAST(pc.RegardingObjectTypeCode AS NVARCHAR(50))
     END                                 AS TypeConcernant,
+
+    -- Référence compte (préfixe ' pour forcer texte dans Excel)
+    CASE
+        WHEN pc.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = pc.RegardingObjectId)
+        ELSE NULL
+    END                                 AS RefCompte,
+
+    -- Référence Atout Prisca
+    CASE
+        WHEN pc.RegardingObjectTypeCode = 1 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 2 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 3 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 4 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = pc.RegardingObjectId)
+        ELSE NULL
+    END                                 AS RefAtoutPrisca,
+
+    -- Code INSEE (préfixe ' pour forcer texte dans Excel)
+    CASE
+        WHEN pc.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = pc.RegardingObjectId)
+        ELSE NULL
+    END                                 AS CodeINSEE,
+
+    -- Code SIRET (préfixe ' pour forcer texte dans Excel)
+    CASE
+        WHEN pc.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = pc.RegardingObjectId)
+        ELSE NULL
+    END                                 AS CodeSIRET,
+
+    -- Code SIREN (préfixe ' pour forcer texte dans Excel)
+    CASE
+        WHEN pc.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = pc.RegardingObjectId)
+        WHEN pc.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = pc.RegardingObjectId)
+        ELSE NULL
+    END                                 AS CodeSIREN,
 
     -- Direction (Entrant/Sortant)
     CASE WHEN pc.DirectionCode = 1
@@ -43,13 +205,14 @@ SELECT
          ELSE 'Entrant'
     END                                 AS Direction,
 
-    -- Origine de l'appel (mask = 1)
+    -- Origine de l'appel (mask = 1) — format : Nom | Prénom | Fonction | HATVP
     (
         SELECT STRING_AGG(
             CAST(
                 ISNULL(c.LastName,  ap.PartyIdName) + ' | ' +
                 ISNULL(c.FirstName, '-')             + ' | ' +
-                ISNULL(sm_fonc.Value, '-')
+                ISNULL(sm_fonc.Value, '-')           + ' | ' +
+                CASE WHEN c.grdf_hatvp = 1 THEN 'Oui' ELSE 'Non' END
             AS NVARCHAR(MAX)), ' ; ')
             WITHIN GROUP (ORDER BY ap.PartyIdName)
         FROM dbo.ActivityParty AS ap
@@ -65,13 +228,14 @@ SELECT
           AND ap.IsPartyDeleted        = 0
     )                                   AS OrigineAppel,
 
-    -- Destination de l'appel (mask = 2)
+    -- Destination de l'appel (mask = 2) — format : Nom | Prénom | Fonction | HATVP
     (
         SELECT STRING_AGG(
             CAST(
                 ISNULL(c.LastName,  ap.PartyIdName) + ' | ' +
                 ISNULL(c.FirstName, '-')             + ' | ' +
-                ISNULL(sm_fonc.Value, '-')
+                ISNULL(sm_fonc.Value, '-')           + ' | ' +
+                CASE WHEN c.grdf_hatvp = 1 THEN 'Oui' ELSE 'Non' END
             AS NVARCHAR(MAX)), ' ; ')
             WITHIN GROUP (ORDER BY ap.PartyIdName)
         FROM dbo.ActivityParty AS ap
@@ -168,7 +332,5 @@ GROUP BY
     pc.RegardingObjectIdName,
     pc.DirectionCode,
     pc.ScheduledStart,
-    pc.ScheduledEnd,
-    pc.ActualDurationMinutes,
     pc.grdf_thematique,
     pc.grdf_type
