@@ -53,9 +53,14 @@ SELECT
         ELSE pc.RegardingObjectIdName
     END                                 AS Concernant,
 
-    -- Compte rattaché au concernant
+    -- Compte / Campagne rattaché(e)
+    -- Si TypeConcernant = Compte => copier la valeur de Concernant
     CASE
-        WHEN pc.RegardingObjectTypeCode = 1 THEN NULL
+        WHEN pc.RegardingObjectTypeCode = 1 THEN
+        (
+            SELECT a.Name FROM dbo.Account AS a
+            WHERE a.AccountId = pc.RegardingObjectId
+        )
         WHEN pc.RegardingObjectTypeCode = 2 THEN
         (
             SELECT a.Name FROM dbo.Contact AS c
@@ -93,7 +98,7 @@ SELECT
             WHERE loc.grdf_localid = pc.RegardingObjectId
         )
         ELSE NULL
-    END                                 AS CompteRattache,
+    END                                 AS [Compte / Campagne rattaché(e)],
 
     -- Type du concernant
     CASE
@@ -108,7 +113,7 @@ SELECT
         ELSE CAST(pc.RegardingObjectTypeCode AS NVARCHAR(50))
     END                                 AS TypeConcernant,
 
-    -- Référence compte (préfixe ' pour forcer texte dans Excel)
+    -- Référence compte
     CASE
         WHEN pc.RegardingObjectTypeCode = 1 THEN
             (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
@@ -142,7 +147,7 @@ SELECT
         ELSE NULL
     END                                 AS RefAtoutPrisca,
 
-    -- Code INSEE (préfixe ' pour forcer texte dans Excel)
+    -- Code INSEE
     CASE
         WHEN pc.RegardingObjectTypeCode = 1 THEN
             (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
@@ -159,7 +164,7 @@ SELECT
         ELSE NULL
     END                                 AS CodeINSEE,
 
-    -- Code SIRET (préfixe ' pour forcer texte dans Excel)
+    -- Code SIRET
     CASE
         WHEN pc.RegardingObjectTypeCode = 1 THEN
             (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
@@ -176,7 +181,7 @@ SELECT
         ELSE NULL
     END                                 AS CodeSIRET,
 
-    -- Code SIREN (préfixe ' pour forcer texte dans Excel)
+    -- Code SIREN
     CASE
         WHEN pc.RegardingObjectTypeCode = 1 THEN
             (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
@@ -199,7 +204,7 @@ SELECT
          ELSE 'Entrant'
     END                                 AS Direction,
 
-    -- Origine de l'appel (mask = 1) — format : Nom | Prénom | Fonction | HATVP
+    -- Origine de l'appel (mask = 1)
     (
         SELECT STRING_AGG(
             CAST(
@@ -222,7 +227,7 @@ SELECT
           AND ap.IsPartyDeleted        = 0
     )                                   AS OrigineAppel,
 
-    -- Destination de l'appel (mask = 2) — format : Nom | Prénom | Fonction | HATVP
+    -- Destination de l'appel (mask = 2)
     (
         SELECT STRING_AGG(
             CAST(
@@ -249,7 +254,6 @@ SELECT
     (
         SELECT COUNT(DISTINCT contact_hatvp.ContactId)
         FROM (
-            -- Contacts HATVP en origine (mask = 1)
             SELECT c.ContactId
             FROM dbo.ActivityParty AS ap
             INNER JOIN dbo.Contact AS c
@@ -259,7 +263,6 @@ SELECT
               AND ap.ParticipationTypeMask = 1
               AND ap.IsPartyDeleted        = 0
             UNION
-            -- Contacts HATVP en destination (mask = 2)
             SELECT c.ContactId
             FROM dbo.ActivityParty AS ap
             INNER JOIN dbo.Contact AS c
@@ -269,7 +272,6 @@ SELECT
               AND ap.ParticipationTypeMask = 2
               AND ap.IsPartyDeleted        = 0
             UNION
-            -- Concernant direct si contact HATVP
             SELECT c.ContactId
             FROM dbo.Contact AS c
             WHERE c.ContactId              = pc.RegardingObjectId
@@ -277,6 +279,29 @@ SELECT
               AND pc.RegardingObjectTypeCode = 2
         ) AS contact_hatvp
     )                                   AS NbInterlocuteursHATV,
+
+    -- Au moins un Député ou Sénateur (origine, destination ou concernant, HATVP ou non)
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c
+                ON  c.ContactId          = ap.PartyId
+                AND c.grdf_fonction      IN (996270020, 996270072)
+            WHERE ap.ActivityId           = pc.ActivityId
+              AND ap.ParticipationTypeMask IN (1, 2)
+              AND ap.IsPartyDeleted       = 0
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM dbo.Contact AS c
+            WHERE c.ContactId                = pc.RegardingObjectId
+              AND pc.RegardingObjectTypeCode  = 2
+              AND c.grdf_fonction            IN (996270020, 996270072)
+        )
+        THEN 'Oui'
+        ELSE 'Non'
+    END                                 AS ContientDeputeOuSenateur,
 
     -- Date planifiée (UTC → Europe/Paris)
     CONVERT(DATE,
