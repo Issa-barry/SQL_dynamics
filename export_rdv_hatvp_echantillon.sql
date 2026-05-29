@@ -58,7 +58,6 @@ SELECT
         ELSE app.RegardingObjectIdName
     END                                 AS Concernant,
     -- Compte / Campagne rattaché(e)
-    -- Si TypeConcernant = Compte => copier la valeur de Concernant
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
         (
@@ -122,20 +121,20 @@ SELECT
         WHEN app.RegardingObjectTypeCode = 10121 THEN 'Local'
         ELSE CAST(app.RegardingObjectTypeCode AS NVARCHAR(50))
     END                                 AS TypeConcernant,
-    -- Référence compte (sans apostrophe)
+    -- Référence compte
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
-            (SELECT ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 2 THEN
-            (SELECT ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 3 THEN
-            (SELECT ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 4 THEN
-            (SELECT ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10118 THEN
-            (SELECT ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10121 THEN
-            (SELECT ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
         ELSE NULL
     END                                 AS RefCompte,
     -- Référence Atout Prisca
@@ -154,52 +153,52 @@ SELECT
             (SELECT a.grdf_reference_atoutprisca FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
         ELSE NULL
     END                                 AS RefAtoutPrisca,
-    -- Code INSEE (sans apostrophe)
+    -- Code INSEE
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
-            (SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 2 THEN
-            (SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 3 THEN
-            (SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 4 THEN
-            (SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10118 THEN
-            (SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10121 THEN
-            (SELECT RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
         ELSE NULL
     END                                 AS CodeINSEE,
-    -- Code SIRET (sans apostrophe)
+    -- Code SIRET
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
-            (SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 2 THEN
-            (SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 3 THEN
-            (SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 4 THEN
-            (SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10118 THEN
-            (SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10121 THEN
-            (SELECT RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
         ELSE NULL
     END                                 AS CodeSIRET,
-    -- Code SIREN (sans apostrophe)
+    -- Code SIREN
     CASE
         WHEN app.RegardingObjectTypeCode = 1 THEN
-            (SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 2 THEN
-            (SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 3 THEN
-            (SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 4 THEN
-            (SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10118 THEN
-            (SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
         WHEN app.RegardingObjectTypeCode = 10121 THEN
-            (SELECT RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
         ELSE NULL
     END                                 AS CodeSIREN,
     MAX(sm_empl.Value)                  AS grdf_emplacement,
@@ -278,7 +277,7 @@ SELECT
             SELECT c.ContactId FROM dbo.ActivityParty AS ap
             INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId
                 AND c.grdf_hatvp        = 1
-                AND c.grdf_valeur_hatvp <> 0   -- remplacer 0 par le code "Non concerné"
+                AND c.grdf_valeur_hatvp <> 0
             WHERE ap.ActivityId              = app.ActivityId
               AND ap.ParticipationTypeMask   = 5
               AND ap.IsPartyDeleted          = 0
@@ -286,7 +285,7 @@ SELECT
             SELECT c.ContactId FROM dbo.ActivityParty AS ap
             INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId
                 AND c.grdf_hatvp        = 1
-                AND c.grdf_valeur_hatvp <> 0   -- remplacer 0 par le code "Non concerné"
+                AND c.grdf_valeur_hatvp <> 0
             WHERE ap.ActivityId              = app.ActivityId
               AND ap.ParticipationTypeMask   = 6
               AND ap.IsPartyDeleted          = 0
@@ -294,10 +293,32 @@ SELECT
             SELECT c.ContactId FROM dbo.Contact AS c
             WHERE c.ContactId               = app.RegardingObjectId
               AND c.grdf_hatvp              = 1
-              AND c.grdf_valeur_hatvp       <> 0   -- remplacer 0 par le code "Non concerné"
+              AND c.grdf_valeur_hatvp       <> 0
               AND app.RegardingObjectTypeCode = 2
         ) AS contact_hatvp
     )                                   AS NbInterlocuteursHATVP,
+    -- Au moins un Député ou Sénateur (participant requis/facultatif ou concernant, HATVP ou non)
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c
+                ON  c.ContactId          = ap.PartyId
+                AND c.grdf_fonction      IN (996270020, 996270072)
+            WHERE ap.ActivityId           = app.ActivityId
+              AND ap.ParticipationTypeMask IN (5, 6)
+              AND ap.IsPartyDeleted       = 0
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM dbo.Contact AS c
+            WHERE c.ContactId                = app.RegardingObjectId
+              AND app.RegardingObjectTypeCode = 2
+              AND c.grdf_fonction            IN (996270020, 996270072)
+        )
+        THEN 'Oui'
+        ELSE 'Non'
+    END                                 AS ContientDeputeOuSenateur,
     -- Date de début (UTC → Europe/Paris)
     CONVERT(DATE,
         app.ScheduledStart AT TIME ZONE 'UTC' AT TIME ZONE 'Romance Standard Time'
@@ -376,7 +397,7 @@ WHERE app.CreatedOn >= '2023-01-01'
                 SELECT 1 FROM dbo.Contact AS c
                 WHERE c.ContactId          = app.RegardingObjectId
                   AND c.grdf_hatvp         = 1
-                  AND c.grdf_valeur_hatvp  <> 0   -- remplacer 0 par le code "Non concerné"
+                  AND c.grdf_valeur_hatvp  <> 0
             )
         )
         OR
@@ -387,13 +408,13 @@ WHERE app.CreatedOn >= '2023-01-01'
             INNER JOIN dbo.Contact AS c
                 ON  c.ContactId          = ap.PartyId
                 AND c.grdf_hatvp         = 1
-                AND c.grdf_valeur_hatvp  <> 0   -- remplacer 0 par le code "Non concerné"
+                AND c.grdf_valeur_hatvp  <> 0
             WHERE ap.ActivityId           = app.ActivityId
               AND ap.ParticipationTypeMask IN (5, 6)
               AND ap.IsPartyDeleted       = 0
         )
       )
-  AND app.ActivityId IN (
+	    AND app.ActivityId IN (
     '93e62a73-0143-f111-8141-005056be5b03',
     '3b2803ca-c72d-f111-8144-005056be1732',
     '92512192-4aed-f011-813d-005056beef00',
