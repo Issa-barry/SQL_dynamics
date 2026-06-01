@@ -129,6 +129,8 @@ LEFT JOIN dbo.StringMap AS sm_prio
     AND sm_prio.AttributeName   = 'prioritycode'
     AND sm_prio.AttributeValue  = app.PriorityCode
     AND sm_prio.LangId          = 1036
+-- ✅ Filtre : uniquement les RDV créés depuis le 01/01/2023
+WHERE app.CreatedOn >= CONVERT(DATETIME, '2023-01-01', 120)
 GROUP BY
     app.ActivityId,
     app.grdf_hatvp,
@@ -143,4 +145,4 @@ GROUP BY
     app.IsAllDayEvent,
     app.ActualDurationMinutes,
     app.grdf_thematique,
-    app.grdf_type_decision_vise
+    app.grdf_type_decision_vise;
