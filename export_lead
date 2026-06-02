@@ -3,8 +3,10 @@ SELECT
     l.LeadId                                        AS [Lead_Id],
     -- Référence du lead
     ISNULL(l.grdf_reference, '')                    AS [Reference_Lead],
-    -- Référence externe
-    ISNULL(l.grdf_reference_externe, '')            AS [Reference_Externe],
+    -- Référence externe (apostrophe préfixée pour forcer le type texte dans Excel)
+    ISNULL('''' + l.grdf_reference_externe, '')     AS [Reference_Externe],
+    -- Code campagne (NVARCHAR pour préserver les zéros de tête)
+    ISNULL(CAST(l.grdf_code_campagne AS NVARCHAR(50)), '') AS [Code_Campagne],
     -- Date de création (sans heure)
     CONVERT(DATE,
         l.createdon AT TIME ZONE 'UTC'
@@ -75,6 +77,3 @@ WHERE
     AND l.createdon <  '2027-01-01'
 ORDER BY
     l.createdon DESC;
-
-
- 
