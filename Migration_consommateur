@@ -1,1 +1,34 @@
 
+SELECT
+    b.PARTNER           AS ID_BP,
+    CASE b.TYPE
+        WHEN '1' THEN 'Personne Physique'
+        WHEN '2' THEN 'Organisation/Morale'
+        WHEN '3' THEN 'Groupe'
+    END                 AS Type_personne,
+    b.NAME_LAST         AS Nom,
+    b.NAME_FIRST        AS Prenom,
+    b.NAME_ORG1         AS Raison_sociale,
+    b.NAME_ORG2         AS Enseigne,
+    b.TITLE             AS Civilite,
+    b.ZZSECT_ACT        AS Secteur_activite,
+    adr.STREET          AS Rue,
+    adr.HOUSE_NUM1      AS Numero,
+    adr.POST_CODE1      AS Code_postal,
+    adr.CITY1           AS Ville,
+    adr.COUNTRY         AS Pays,
+    email.SMTP_ADDR     AS Email,
+    fixe.TEL_NUMBER     AS Telephone_fixe,
+    mobile.TEL_NUMBER   AS Telephone_mobile,
+    siret.IDNUMBER      AS SIRET
+FROM SAPGDF.BUT000 b
+    JOIN SAPGDF.BUT020 a             ON (a.PARTNER = b.PARTNER)
+    JOIN SAPGDF.ADRC adr             ON (adr.ADDRNUMBER = a.ADDRNUMBER)
+    LEFT JOIN SAPGDF.ADR6 email      ON (email.ADDRNUMBER = a.ADDRNUMBER)
+    LEFT JOIN SAPGDF.ADR2 fixe       ON (fixe.ADDRNUMBER = a.ADDRNUMBER AND fixe.CONSNUMBER = '001')
+    LEFT JOIN SAPGDF.ADR2 mobile     ON (mobile.ADDRNUMBER = a.ADDRNUMBER AND mobile.CONSNUMBER = '002')
+    LEFT JOIN SAPGDF.BUT0ID siret    ON (siret.PARTNER = b.PARTNER
+                                     AND siret.TYPE = 'ZSIRET'
+                                     AND siret.VALID_DATE_TO = '99991231')
+WHERE b.BU_GROUP = 'Z2' and siret.IDNUMBER ='91806370200016'
+AND ROWNUM <= 30
