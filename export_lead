@@ -1,6 +1,10 @@
 SELECT
     -- ID du lead
     l.LeadId                                        AS [Lead_Id],
+    -- Référence du lead
+    ISNULL(l.grdf_reference, '')                    AS [Reference_Lead],
+    -- Référence externe
+    ISNULL(l.grdf_reference_externe, '')            AS [Reference_Externe],
     -- Date de création (sans heure)
     CONVERT(DATE,
         l.createdon AT TIME ZONE 'UTC'
@@ -71,3 +75,6 @@ WHERE
     AND l.createdon <  '2027-01-01'
 ORDER BY
     l.createdon DESC;
+
+
+ 
