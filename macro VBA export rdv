@@ -1,0 +1,70 @@
+Sub SupprimerApostrophes()
+
+    Dim ws          As Worksheet
+    Dim rng         As Range
+    Dim cell        As Range
+    Dim colsAvecApostrophe As Variant
+    Dim colName     As Variant
+    Dim headerRow   As Long
+    Dim lastRow     As Long
+    Dim colIdx      As Long
+    Dim i           As Long
+
+    ' =========================================================
+    ' PARAMETRES
+    ' =========================================================
+    Set ws = ActiveSheet
+    headerRow = 1  ' ligne des en-têtes
+
+    ' Colonnes concernées par la suppression d'apostrophe
+    colsAvecApostrophe = Array("RefCompte", "CodeINSEE", "CodeSIRET", "CodeSIREN")
+
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+
+    ' =========================================================
+    ' TRAITEMENT
+    ' =========================================================
+    For Each colName In colsAvecApostrophe
+
+        ' Trouver l'index de la colonne par son en-tête
+        colIdx = 0
+        For i = 1 To ws.Cells(headerRow, ws.Columns.Count).End(xlToLeft).Column
+            If ws.Cells(headerRow, i).Value = colName Then
+                colIdx = i
+                Exit For
+            End If
+        Next i
+
+        If colIdx = 0 Then
+            ' Colonne introuvable, on passe
+            GoTo SuivantColonne
+        End If
+
+        ' Parcourir toutes les cellules de données
+        For Each cell In ws.Range(ws.Cells(headerRow + 1, colIdx), ws.Cells(lastRow, colIdx))
+
+            If Not IsEmpty(cell) And Not IsNull(cell.Value) Then
+
+                Dim valStr As String
+                valStr = CStr(cell.Value)
+
+                ' Supprimer l'apostrophe en tête si présente
+                If Left(valStr, 1) = "'" Then
+                    valStr = Mid(valStr, 2)
+                End If
+
+                ' Réécrire la valeur en TEXT pour conserver les zéros initiaux
+                ' On utilise NumberFormat texte AVANT d'écrire
+                cell.NumberFormat = "@"
+                cell.Value = valStr
+
+            End If
+
+        Next cell
+
+SuivantColonne:
+    Next colName
+
+    MsgBox "Suppression des apostrophes terminée (" & lastRow - headerRow & " lignes traitées).", vbInformation
+
+End Sub
