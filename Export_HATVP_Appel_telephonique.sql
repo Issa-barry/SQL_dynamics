@@ -21,7 +21,9 @@ SELECT
     pc.OwnerIdName                      AS Proprietaire,
     pc.Description,
 
+    -- ============================================================
     -- Concernant
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 2 THEN
         (
@@ -52,7 +54,9 @@ SELECT
         ELSE pc.RegardingObjectIdName
     END                                 AS Concernant,
 
+    -- ============================================================
     -- Compte / Campagne rattaché(e)
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 1 THEN
             (SELECT a.Name FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
@@ -71,7 +75,9 @@ SELECT
         ELSE NULL
     END                                 AS [Compte / Campagne rattaché(e)],
 
+    -- ============================================================
     -- Type du concernant
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 2     THEN 'Contact'
         WHEN pc.RegardingObjectTypeCode = 1     THEN 'Compte'
@@ -84,7 +90,9 @@ SELECT
         ELSE CAST(pc.RegardingObjectTypeCode AS NVARCHAR(50))
     END                                 AS TypeConcernant,
 
+    -- ============================================================
     -- Référence compte
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 1     THEN (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
         WHEN pc.RegardingObjectTypeCode = 2     THEN (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
@@ -95,7 +103,9 @@ SELECT
         ELSE NULL
     END                                 AS RefCompte,
 
+    -- ============================================================
     -- Référence Atout Prisca
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 1     THEN (SELECT a.grdf_reference_atoutprisca FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
         WHEN pc.RegardingObjectTypeCode = 2     THEN (SELECT a.grdf_reference_atoutprisca FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
@@ -106,7 +116,9 @@ SELECT
         ELSE NULL
     END                                 AS RefAtoutPrisca,
 
+    -- ============================================================
     -- Code INSEE
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 1     THEN (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
         WHEN pc.RegardingObjectTypeCode = 2     THEN (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
@@ -117,7 +129,9 @@ SELECT
         ELSE NULL
     END                                 AS CodeINSEE,
 
+    -- ============================================================
     -- Code SIRET
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 1     THEN (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
         WHEN pc.RegardingObjectTypeCode = 2     THEN (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
@@ -128,7 +142,9 @@ SELECT
         ELSE NULL
     END                                 AS CodeSIRET,
 
+    -- ============================================================
     -- Code SIREN
+    -- ============================================================
     CASE
         WHEN pc.RegardingObjectTypeCode = 1     THEN (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Account AS a WHERE a.AccountId = pc.RegardingObjectId)
         WHEN pc.RegardingObjectTypeCode = 2     THEN (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = pc.RegardingObjectId)
@@ -149,8 +165,29 @@ SELECT
     MAX(oa.MAIA)                        AS MAIA_Origine_Appel,
 
     -- ============================================================
+    -- Au moins un Député, Sénateur ou Préfet
+    -- Député = 996270020, Sénateur = 996270072, Préfet = 996270055
+    -- ============================================================
+    CASE
+        WHEN EXISTS (
+            SELECT 1 FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId
+                AND c.grdf_fonction IN (996270020, 996270072, 996270055)
+            WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask IN (1, 2) AND ap.IsPartyDeleted = 0
+        )
+        OR EXISTS (
+            SELECT 1 FROM dbo.Contact AS c
+            WHERE c.ContactId = pc.RegardingObjectId AND pc.RegardingObjectTypeCode = 2
+              AND c.grdf_fonction IN (996270020, 996270072, 996270055)
+        )
+        THEN 'Oui'
+        ELSE 'Non'
+    END                                 AS ContientDeputeOuSenateurOuPrefet,
+
+    -- ============================================================
     -- DESTINATAIRES APPEL : 15 × 3 colonnes fixes (Contacts, mask=2)
     -- ============================================================
+
     -- Destinataire 1
     (SELECT TRIM(ISNULL(c.FirstName,'') + ' ' + ISNULL(c.LastName,''))   FROM (SELECT ap.PartyId, ROW_NUMBER() OVER (ORDER BY ap.PartyIdName) AS rn FROM dbo.ActivityParty AS ap WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask = 2 AND ap.IsPartyDeleted = 0) x INNER JOIN dbo.Contact AS c ON c.ContactId = x.PartyId WHERE x.rn = 1)  AS Destinataire_Appel_Nom_1,
     (SELECT ISNULL(sm.Value,'-')         FROM (SELECT ap.PartyId, ROW_NUMBER() OVER (ORDER BY ap.PartyIdName) AS rn FROM dbo.ActivityParty AS ap WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask = 2 AND ap.IsPartyDeleted = 0) x INNER JOIN dbo.Contact AS c ON c.ContactId = x.PartyId LEFT JOIN dbo.StringMap AS sm ON sm.ObjectTypeCode = 2 AND sm.AttributeName = 'grdf_fonction' AND sm.AttributeValue = c.grdf_fonction AND sm.LangId = 1036 WHERE x.rn = 1)  AS Destinataire_Appel_Fonction_1,
@@ -226,7 +263,9 @@ SELECT
     (SELECT ISNULL(sm.Value,'-')         FROM (SELECT ap.PartyId, ROW_NUMBER() OVER (ORDER BY ap.PartyIdName) AS rn FROM dbo.ActivityParty AS ap WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask = 2 AND ap.IsPartyDeleted = 0) x INNER JOIN dbo.Contact AS c ON c.ContactId = x.PartyId LEFT JOIN dbo.StringMap AS sm ON sm.ObjectTypeCode = 2 AND sm.AttributeName = 'grdf_fonction' AND sm.AttributeValue = c.grdf_fonction AND sm.LangId = 1036 WHERE x.rn = 15) AS Destinataire_Appel_Fonction_15,
     (SELECT CASE WHEN c.grdf_hatvp = 1 THEN 'Oui' ELSE 'Non' END        FROM (SELECT ap.PartyId, ROW_NUMBER() OVER (ORDER BY ap.PartyIdName) AS rn FROM dbo.ActivityParty AS ap WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask = 2 AND ap.IsPartyDeleted = 0) x INNER JOIN dbo.Contact AS c ON c.ContactId = x.PartyId WHERE x.rn = 15) AS Destinataire_Appel_HATVP_15,
 
+    -- ============================================================
     -- Nombre d'interlocuteurs HATVP
+    -- ============================================================
     (
         SELECT COUNT(DISTINCT contact_hatvp.ContactId)
         FROM (
@@ -244,23 +283,7 @@ SELECT
             FROM dbo.Contact AS c
             WHERE c.ContactId = pc.RegardingObjectId AND c.grdf_hatvp = 1 AND pc.RegardingObjectTypeCode = 2
         ) AS contact_hatvp
-    )                                   AS NbInterlocuteursHATV,
-
-    -- Au moins un Député ou Sénateur
-    CASE
-        WHEN EXISTS (
-            SELECT 1 FROM dbo.ActivityParty AS ap
-            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId AND c.grdf_fonction IN (996270020, 996270072)
-            WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask IN (1, 2) AND ap.IsPartyDeleted = 0
-        )
-        OR EXISTS (
-            SELECT 1 FROM dbo.Contact AS c
-            WHERE c.ContactId = pc.RegardingObjectId AND pc.RegardingObjectTypeCode = 2
-              AND c.grdf_fonction IN (996270020, 996270072)
-        )
-        THEN 'Oui'
-        ELSE 'Non'
-    END                                 AS ContientDeputeOuSenateur,
+    )                                   AS NbInterlocuteursHATVP,
 
     -- Date planifiée (UTC → Europe/Paris)
     CONVERT(DATE,
@@ -271,7 +294,9 @@ SELECT
     MAX(sm_type.Value)                  AS grdf_Type,
     MAX(sm_prio.Value)                  AS Priorite,
 
+    -- ============================================================
     -- Thématiques
+    -- ============================================================
     (
         SELECT STRING_AGG(CAST(sm_them.Value AS NVARCHAR(MAX)), ', ')
             WITHIN GROUP (ORDER BY sm_them.Value)
@@ -298,16 +323,36 @@ LEFT JOIN dbo.StringMap AS sm_prio
 
 WHERE pc.CreatedOn >= '2023-01-01'
   AND (
+        -- Cas 1 : au moins un appelant Contact avec grdf_hatvp = 1 (mask=1)
         EXISTS (
             SELECT 1 FROM dbo.ActivityParty AS ap
             INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId AND c.grdf_hatvp = 1
             WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask = 1 AND ap.IsPartyDeleted = 0
         )
         OR
+        -- Cas 2 : au moins un destinataire Contact avec grdf_hatvp = 1 (mask=2)
         EXISTS (
             SELECT 1 FROM dbo.ActivityParty AS ap
             INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId AND c.grdf_hatvp = 1
             WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask = 2 AND ap.IsPartyDeleted = 0
+        )
+        OR
+        -- Cas 3 : au moins un participant dont fonction = Député, Sénateur ou Préfet (mask=1 ou 2)
+        EXISTS (
+            SELECT 1 FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId
+                AND c.grdf_fonction IN (996270020, 996270072, 996270055)
+            WHERE ap.ActivityId = pc.ActivityId AND ap.ParticipationTypeMask IN (1, 2) AND ap.IsPartyDeleted = 0
+        )
+        OR
+        -- Cas 4 : Concernant = Contact dont fonction = Député, Sénateur ou Préfet
+        (
+            pc.RegardingObjectTypeCode = 2
+            AND EXISTS (
+                SELECT 1 FROM dbo.Contact AS c
+                WHERE c.ContactId = pc.RegardingObjectId
+                  AND c.grdf_fonction IN (996270020, 996270072, 996270055)
+            )
         )
       )
 
