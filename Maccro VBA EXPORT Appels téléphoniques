@@ -1,0 +1,105 @@
+
+Option Explicit
+
+' ============================================================
+' Macro : Nettoyer_Apostrophes_PhoneCall_HATVP
+' Objectif : Supprimer les apostrophes de préfixe Excel sur les
+'            colonnes RefCompte, CodeINSEE, CodeSIRET, CodeSIREN
+'            en conservant les zéros initiaux (cellule en texte).
+' ============================================================
+
+Sub Nettoyer_Apostrophes_PhoneCall_HATVP()
+
+    Dim ws          As Worksheet
+    Dim rngHeader   As Range
+    Dim cell        As Range
+    Dim lastRow     As Long
+    Dim lastCol     As Long
+    Dim i           As Long
+
+    ' --- Colonnes à traiter (noms exacts des en-têtes) ---
+    Dim colNames(3) As String
+    colNames(0) = "RefCompte"
+    colNames(1) = "CodeINSEE"
+    colNames(2) = "CodeSIRET"
+    colNames(3) = "CodeSIREN"
+
+    Dim colIndexes(3) As Long
+    Dim j             As Integer
+
+    ' --- Feuille active ---
+    Set ws = ActiveSheet
+
+    ' --- Trouver la ligne d'en-tête (ligne 1 par défaut) ---
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+
+    ' --- Résoudre les index de colonnes ---
+    For j = 0 To 3
+        colIndexes(j) = 0
+        For Each cell In ws.Range(ws.Cells(1, 1), ws.Cells(1, lastCol))
+            If Trim(cell.Value) = colNames(j) Then
+                colIndexes(j) = cell.Column
+                Exit For
+            End If
+        Next cell
+        If colIndexes(j) = 0 Then
+            MsgBox "Colonne introuvable : " & colNames(j) & Chr(10) & _
+                   "Vérifiez que la ligne 1 contient les en-têtes.", _
+                   vbExclamation, "Colonne manquante"
+        End If
+    Next j
+
+    ' --- Désactiver le calcul automatique pour la performance ---
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+
+    ' --- Traitement ligne par ligne (à partir de la ligne 2) ---
+    For i = 2 To lastRow
+        For j = 0 To 3
+            If colIndexes(j) > 0 Then
+                Call SupprimerApostrophe(ws.Cells(i, colIndexes(j)))
+            End If
+        Next j
+    Next i
+
+    ' --- Réactiver ---
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+
+    MsgBox "Nettoyage terminé." & Chr(10) & _
+           lastRow - 1 & " ligne(s) traitée(s).", _
+           vbInformation, "PhoneCall HATVP — Apostrophes supprimées"
+
+End Sub
+
+
+' ============================================================
+' Procédure : SupprimerApostrophe
+' Supprime l'apostrophe de préfixe d'une cellule en réécrivant
+' sa valeur en tant que texte (préserve les zéros initiaux).
+' ============================================================
+
+Private Sub SupprimerApostrophe(cel As Range)
+
+    Dim valeur As String
+
+    ' Ignorer les cellules vides ou NULL
+    If IsEmpty(cel) Or cel.Value = "" Or cel.Value = "NULL" Then Exit Sub
+
+    valeur = CStr(cel.Value)
+
+    ' Supprimer l'apostrophe de préfixe si présente
+    If Left(valeur, 1) = "'" Then
+        valeur = Mid(valeur, 2)
+    End If
+
+    ' Réécrire en texte pour conserver les zéros initiaux
+    With cel
+        .NumberFormat = "@"          ' Format texte
+        .Value = valeur              ' Réaffectation ? supprime le préfixe apostrophe
+    End With
+
+End Sub
+
+
