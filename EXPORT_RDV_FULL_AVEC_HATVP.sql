@@ -1,8 +1,8 @@
 SELECT
     app.ActivityId,
     app.grdf_hatvp                      AS RDV_hatvp,
-    app.Subject                         AS Libelle,
-    app.Description,
+    REPLACE(REPLACE(app.Subject,     CHAR(13), ' '), CHAR(10), ' ') AS Libelle,
+    REPLACE(REPLACE(app.Description, CHAR(13), ' '), CHAR(10), ' ') AS Description,
     -- Concernant : Nom | Prénom | Fonction
     CASE
         WHEN app.RegardingObjectTypeCode = 2 THEN
@@ -147,6 +147,43 @@ SELECT
     app.Location                        AS Lieu,
     MAX(sm_stat.Value)                  AS Statut,
     app.OwnerIdName                     AS Proprietaire,
+
+    -- =========================================================
+    -- NbInterlocuteursHATVP et ContientDeputeOuSenateurOuPrefet
+    -- =========================================================
+    (
+        SELECT COUNT(DISTINCT contact_hatvp.ContactId)
+        FROM (
+            SELECT c.ContactId FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId AND c.grdf_hatvp = 1
+            WHERE ap.ActivityId = app.ActivityId AND ap.ParticipationTypeMask = 5 AND ap.IsPartyDeleted = 0
+            UNION
+            SELECT c.ContactId FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId AND c.grdf_hatvp = 1
+            WHERE ap.ActivityId = app.ActivityId AND ap.ParticipationTypeMask = 6 AND ap.IsPartyDeleted = 0
+            UNION
+            SELECT c.ContactId FROM dbo.Contact AS c
+            WHERE c.ContactId = app.RegardingObjectId
+              AND c.grdf_hatvp = 1
+              AND app.RegardingObjectTypeCode = 2
+        ) AS contact_hatvp
+    )                                   AS NbInterlocuteursHATVP,
+
+    CASE
+        WHEN EXISTS (
+            SELECT 1 FROM dbo.ActivityParty AS ap
+            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId
+                AND c.grdf_fonction IN (996270020, 996270072, 996270055)
+            WHERE ap.ActivityId = app.ActivityId AND ap.ParticipationTypeMask IN (5,6) AND ap.IsPartyDeleted = 0
+        )
+        OR EXISTS (
+            SELECT 1 FROM dbo.Contact AS c
+            WHERE c.ContactId = app.RegardingObjectId
+              AND app.RegardingObjectTypeCode = 2
+              AND c.grdf_fonction IN (996270020, 996270072, 996270055)
+        )
+        THEN 'Oui' ELSE 'Non'
+    END                                 AS ContientDeputeOuSenateurOuPrefet,
 
     -- =========================================================
     -- Participants internes : 5 colonnes Nom + 5 colonnes MAIA
@@ -659,40 +696,6 @@ SELECT
     -- =========================================================
     -- Reste des colonnes
     -- =========================================================
-    (
-        SELECT COUNT(DISTINCT contact_hatvp.ContactId)
-        FROM (
-            SELECT c.ContactId FROM dbo.ActivityParty AS ap
-            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId AND c.grdf_hatvp = 1
-            WHERE ap.ActivityId = app.ActivityId AND ap.ParticipationTypeMask = 5 AND ap.IsPartyDeleted = 0
-            UNION
-            SELECT c.ContactId FROM dbo.ActivityParty AS ap
-            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId AND c.grdf_hatvp = 1
-            WHERE ap.ActivityId = app.ActivityId AND ap.ParticipationTypeMask = 6 AND ap.IsPartyDeleted = 0
-            UNION
-            SELECT c.ContactId FROM dbo.Contact AS c
-            WHERE c.ContactId = app.RegardingObjectId
-              AND c.grdf_hatvp = 1
-              AND app.RegardingObjectTypeCode = 2
-        ) AS contact_hatvp
-    )                                   AS NbInterlocuteursHATVP,
-
-    CASE
-        WHEN EXISTS (
-            SELECT 1 FROM dbo.ActivityParty AS ap
-            INNER JOIN dbo.Contact AS c ON c.ContactId = ap.PartyId
-                AND c.grdf_fonction IN (996270020, 996270072, 996270055)
-            WHERE ap.ActivityId = app.ActivityId AND ap.ParticipationTypeMask IN (5,6) AND ap.IsPartyDeleted = 0
-        )
-        OR EXISTS (
-            SELECT 1 FROM dbo.Contact AS c
-            WHERE c.ContactId = app.RegardingObjectId
-              AND app.RegardingObjectTypeCode = 2
-              AND c.grdf_fonction IN (996270020, 996270072, 996270055)
-        )
-        THEN 'Oui' ELSE 'Non'
-    END                                 AS ContientDeputeOuSenateurOuPrefet,
-
     CONVERT(DATE,
         app.ScheduledStart AT TIME ZONE 'UTC' AT TIME ZONE 'Romance Standard Time'
     )                                   AS Date_Debut,
@@ -719,7 +722,7 @@ SELECT
     sm_act.Value                        AS HATVP_TypeAction,
     sm_obj.Value                        AS HATVP_ObjetDecision,
     sm_dom.Value                        AS HATVP_DomaineIntervention,
-    app.grdf_decision_visee             AS HATVP_DecisionVisee
+    REPLACE(REPLACE(app.grdf_decision_visee, CHAR(13), ' '), CHAR(10), ' ') AS HATVP_DecisionVisee
 
 FROM dbo.Appointment AS app
 
