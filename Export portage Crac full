@@ -1,0 +1,285 @@
+SELECT TOP 30
+    app.ActivityId,
+
+    -- Type
+    MAX(sm_type.Value)                  AS [Type],
+
+    -- Thématiques
+    (
+        SELECT STRING_AGG(CAST(sm_them.Value AS NVARCHAR(MAX)), ', ')
+            WITHIN GROUP (ORDER BY sm_them.Value)
+        FROM dbo.StringMap AS sm_them
+        WHERE sm_them.ObjectTypeCode = 4201
+          AND sm_them.AttributeName  = 'grdf_thematique'
+          AND CHARINDEX(CAST(sm_them.AttributeValue AS VARCHAR(20)), app.grdf_thematique) > 0
+          AND sm_them.LangId         = 1036
+    )                                   AS [Thématique],
+
+    -- Libellé
+    REPLACE(REPLACE(app.Subject,     CHAR(13), ' '), CHAR(10), ' ') AS [Libellé],
+
+    -- Emplacement
+    MAX(sm_empl.Value)                  AS [Emplacement],
+
+    -- Jour et heure de début
+    CONVERT(DATETIME,
+        app.ScheduledStart AT TIME ZONE 'UTC' AT TIME ZONE 'Romance Standard Time'
+    )                                   AS [Jour et heure de début],
+
+    -- Type de Concernant
+    CASE
+        WHEN app.RegardingObjectTypeCode = 2     THEN 'Contact'
+        WHEN app.RegardingObjectTypeCode = 1     THEN 'Compte'
+        WHEN app.RegardingObjectTypeCode = 3     THEN 'Projet'
+        WHEN app.RegardingObjectTypeCode = 4     THEN 'Lead'
+        WHEN app.RegardingObjectTypeCode = 4400  THEN 'Campagne'
+        WHEN app.RegardingObjectTypeCode = 4402  THEN 'Activité de campagne'
+        WHEN app.RegardingObjectTypeCode = 10118 THEN 'Contrat'
+        WHEN app.RegardingObjectTypeCode = 10121 THEN 'Local'
+        ELSE CAST(app.RegardingObjectTypeCode AS NVARCHAR(50))
+    END                                 AS [Type de Concernant],
+
+    -- Compte rattaché au Concernant
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT a.Name FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT a.Name FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT a.Name FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT a.Name FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4402 THEN
+            (SELECT c.Name FROM dbo.CampaignActivity AS ca INNER JOIN dbo.Campaign AS c ON c.CampaignId = ca.RegardingObjectId WHERE ca.ActivityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT a.Name FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT a.Name FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS [Compte rattaché au Concernant],
+
+    -- Agence du compte rattaché au Concernant
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT a.grdf_agenceName FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT a.grdf_agenceName FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT a.grdf_agenceName FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT a.grdf_agenceName FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4402 THEN
+            NULL
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT a.grdf_agenceName FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT a.grdf_agenceName FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS [Division / agence du compte rattaché au concernant],
+
+    -- Typologie du compte rattaché au Concernant
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT sm_typo.Value FROM dbo.Account AS a LEFT JOIN dbo.StringMap AS sm_typo ON sm_typo.ObjectTypeCode = 1 AND sm_typo.AttributeName = 'grdf_typologie' AND sm_typo.AttributeValue = a.grdf_typologie AND sm_typo.LangId = 1036 WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT sm_typo.Value FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId LEFT JOIN dbo.StringMap AS sm_typo ON sm_typo.ObjectTypeCode = 1 AND sm_typo.AttributeName = 'grdf_typologie' AND sm_typo.AttributeValue = a.grdf_typologie AND sm_typo.LangId = 1036 WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT sm_typo.Value FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId LEFT JOIN dbo.StringMap AS sm_typo ON sm_typo.ObjectTypeCode = 1 AND sm_typo.AttributeName = 'grdf_typologie' AND sm_typo.AttributeValue = a.grdf_typologie AND sm_typo.LangId = 1036 WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT sm_typo.Value FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId LEFT JOIN dbo.StringMap AS sm_typo ON sm_typo.ObjectTypeCode = 1 AND sm_typo.AttributeName = 'grdf_typologie' AND sm_typo.AttributeValue = a.grdf_typologie AND sm_typo.LangId = 1036 WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4402 THEN
+            NULL
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT sm_typo.Value FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte LEFT JOIN dbo.StringMap AS sm_typo ON sm_typo.ObjectTypeCode = 1 AND sm_typo.AttributeName = 'grdf_typologie' AND sm_typo.AttributeValue = a.grdf_typologie AND sm_typo.LangId = 1036 WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT sm_typo.Value FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid LEFT JOIN dbo.StringMap AS sm_typo ON sm_typo.ObjectTypeCode = 1 AND sm_typo.AttributeName = 'grdf_typologie' AND sm_typo.AttributeValue = a.grdf_typologie AND sm_typo.LangId = 1036 WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS [Typologie],
+
+    -- Compétence gaz Transférée à autorité concédante
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Account AS a LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4402 THEN
+            NULL
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT sm_cgaz.Value FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT sm_cgaz.Value FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS [Compétence gaz Transférée à autorité concédante],
+
+    -- Autorité concédante du concernant
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT a.grdf_autorite_concedanteidName FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT a.grdf_autorite_concedanteidName FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT a.grdf_autorite_concedanteidName FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT a.grdf_autorite_concedanteidName FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4402 THEN
+            NULL
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT a.grdf_autorite_concedanteidName FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT a.grdf_autorite_concedanteidName FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS [Autorité concédante du concernant],
+
+    -- Description
+    REPLACE(REPLACE(app.Description, CHAR(13), ' '), CHAR(10), ' ') AS Description,
+
+    -- Concernant : Nom | Prénom | Fonction
+    CASE
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+        (
+            SELECT
+                ISNULL(c.LastName,  '-') + ' | ' +
+                ISNULL(c.FirstName, '-') + ' | ' +
+                ISNULL(sm_fonc.Value, '-')
+            FROM dbo.Contact AS c
+            LEFT JOIN dbo.StringMap AS sm_fonc
+                ON  sm_fonc.ObjectTypeCode = 2
+                AND sm_fonc.AttributeName  = 'grdf_fonction'
+                AND sm_fonc.AttributeValue = c.grdf_fonction
+                AND sm_fonc.LangId         = 1036
+            WHERE c.ContactId = app.RegardingObjectId
+        )
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT a.Name FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT o.Name FROM dbo.Opportunity AS o WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT l.Subject FROM dbo.Lead AS l WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4402 THEN
+            (SELECT ca.Subject FROM dbo.CampaignActivity AS ca WHERE ca.ActivityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT ct.grdf_name FROM dbo.grdf_contrat AS ct WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT loc.grdf_nom FROM dbo.grdf_local AS loc WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE app.RegardingObjectIdName
+    END                                 AS Concernant,
+
+    -- Référence compte
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + ISNULL(CAST(a.grdf_reference AS NVARCHAR(50)), '') FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS RefCompte,
+
+    -- Référence Atout Prisca
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT a.grdf_reference_atoutprisca FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS RefAtoutPrisca,
+
+    -- Code INSEE
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + RIGHT('00000' + ISNULL(CAST(a.grdf_code_insee AS NVARCHAR(5)), ''), 5) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS CodeINSEE,
+
+    -- Code SIRET
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + RIGHT('00000000000000' + ISNULL(CAST(a.grdf_siret AS NVARCHAR(14)), ''), 14) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS CodeSIRET,
+
+    -- Code SIREN
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Account AS a WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT '''' + RIGHT('000000000' + ISNULL(LEFT(CAST(a.grdf_siret AS NVARCHAR(14)), 9), ''), 9) FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS CodeSIREN,
+
+    MAX(sm_stat.Value)                  AS Statut,
+    app.OwnerIdName                     AS Proprietaire
+
+FROM dbo.Appointment AS app
+
+LEFT JOIN dbo.StringMap AS sm_stat
+    ON sm_stat.ObjectTypeCode = 4201 AND sm_stat.AttributeName = 'statecode'
+    AND sm_stat.AttributeValue = app.StateCode AND sm_stat.LangId = 1036
+LEFT JOIN dbo.StringMap AS sm_type
+    ON sm_type.ObjectTypeCode = 4201 AND sm_type.AttributeName = 'grdf_type'
+    AND sm_type.AttributeValue = app.grdf_type AND sm_type.LangId = 1036
+LEFT JOIN dbo.StringMap AS sm_empl
+    ON sm_empl.ObjectTypeCode = 4201 AND sm_empl.AttributeName = 'grdf_emplacement'
+    AND sm_empl.AttributeValue = app.grdf_emplacement AND sm_empl.LangId = 1036
+
+WHERE app.CreatedOn >= '2023-01-01'
+
+GROUP BY
+    app.ActivityId,
+    app.Subject,
+    app.OwnerIdName,
+    app.Description,
+    app.RegardingObjectId,
+    app.RegardingObjectTypeCode,
+    app.RegardingObjectIdName,
+    app.ScheduledStart,
+    app.ScheduledEnd,
+    app.IsAllDayEvent,
+    app.ActualDurationMinutes,
+    app.grdf_thematique;
