@@ -96,6 +96,25 @@ SELECT TOP 30
         ELSE NULL
     END                                 AS [Typologie],
 
+    -- Compétence gaz Transférée à autorité concédante
+    CASE
+        WHEN app.RegardingObjectTypeCode = 1 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Account AS a LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE a.AccountId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 2 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Contact AS c INNER JOIN dbo.Account AS a ON a.AccountId = c.AccountId LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE c.ContactId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 3 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Opportunity AS o INNER JOIN dbo.Account AS a ON a.AccountId = o.AccountId LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE o.OpportunityId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4 THEN
+            (SELECT sm_cgaz.Value FROM dbo.Lead AS l INNER JOIN dbo.Account AS a ON a.AccountId = l.ParentAccountId LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE l.LeadId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 4402 THEN
+            NULL
+        WHEN app.RegardingObjectTypeCode = 10118 THEN
+            (SELECT sm_cgaz.Value FROM dbo.grdf_contrat AS ct INNER JOIN dbo.Account AS a ON a.AccountId = ct.grdf_Compte LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE ct.grdf_contratId = app.RegardingObjectId)
+        WHEN app.RegardingObjectTypeCode = 10121 THEN
+            (SELECT sm_cgaz.Value FROM dbo.grdf_local AS loc INNER JOIN dbo.Account AS a ON a.AccountId = loc.grdf_compteid LEFT JOIN dbo.StringMap AS sm_cgaz ON sm_cgaz.ObjectTypeCode = 1 AND sm_cgaz.AttributeName = 'grdf_competence_gaz_transfere_autorite' AND sm_cgaz.AttributeValue = a.grdf_competence_gaz_transfere_autorite AND sm_cgaz.LangId = 1036 WHERE loc.grdf_localid = app.RegardingObjectId)
+        ELSE NULL
+    END                                 AS [Compétence gaz Transférée à autorité concédante],
+
     -- Description
     REPLACE(REPLACE(app.Description, CHAR(13), ' '), CHAR(10), ' ') AS Description,
 
