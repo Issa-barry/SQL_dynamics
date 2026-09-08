@@ -1,0 +1,107 @@
+/* =========================================================================
+   Extraction de TOUS les Projets (entité opportunity) - CRM360 (SQL Server)
+   Reconstruit l'export IHM "Projets" (mêmes colonnes, mêmes libellés),
+   sans filtre de date, sans lots (~380k lignes attendues).
+
+   IMPORTANT : on utilise les VUES "Opportunity" / "Account" / "Lead" /
+   "Campaign" (sans le suffixe Base), pas les tables "...Base" brutes.
+   Ces vues exposent automatiquement, pour chaque champ LOOKUP, une
+   colonne <champ>Name déjà résolue (ex: grdf_agenceidName, OwnerIdName,
+   grdf_responsableidName, ParentAccountIdName, OriginatingLeadIdName...).
+   -> Plus besoin de joindre TeamBase/SystemUserBase à la main pour ça.
+
+   En revanche, les PICKLISTS (StateCode, StatusCode, grdf_fidelisation,
+   grdf_segment_marche, etc.) ne sont PAS résolues automatiquement dans
+   ces vues (pas de colonne ...Name pour elles) : on garde les jointures
+   StringMap pour celles-là (LangId = 1036, français).
+   ========================================================================= */
+
+SELECT
+    o.OpportunityId                                        AS ProjectId,
+    o.grdf_reference                                        AS Reference,
+    o.name                                                  AS DesignationProjet,
+    sm_state.[Value]                                        AS Statut,
+    sm_status.[Value]                                       AS RaisonDuStatut,
+    o.grdf_agenceidName                                     AS Agence,
+    o.grdf_code_insee                                       AS CodeInsee,
+    sm_fid.[Value]                                          AS Fidelisation,
+    sm_mecfid.[Value]                                       AS MecaniqueFidelisation,
+    sm_segm.[Value]                                         AS SegmentMarche,
+    sm_segd.[Value]                                         AS SegmentDev,
+    sm_exneuf.[Value]                                       AS ExistantNeuf,
+    o.grdf_total_logements_gaz                              AS TotalLogementsGaz,
+    o.createdon                                             AS CreeLe,
+    o.grdf_date_etape_accepte                               AS DateEtapeAccepte,
+    o.grdf_chiffre_affaire                                  AS ChiffreAffaires,
+    o.grdf_conso_ref                                        AS ConsoRefMWh,
+    gl.grdf_chauffage                                       AS ChauffageLocal,
+    gl.grdf_ecs                                             AS ECSLocal,
+    gl.grdf_evapdc                                          AS EVAPDCLocal,
+    gl.grdf_emetteur                                        AS EmetteurLocal,
+    gl.grdf_generateur                                      AS GenerateurLocal,
+    a.grdf_reference                                        AS ReferenceCompteMOA,
+    o.ParentAccountIdName                                   AS NomCompteMOA,
+    o.grdf_nombre_total_apparts_chauffage_collectif         AS NbApptChauffageCollectif,
+    o.grdf_nombre_total_apparts_chauffage_individuel        AS NbApptChauffageIndividuel,
+    o.grdf_nombre_maisons_individuelle                      AS NbMaisonIndividuelle,
+    sm_energie.[Value]                                      AS EnergieEnPlace,
+    o.OwnerIdName                                           AS ProprietaireProjet,
+    o.grdf_responsableidName                                AS Responsable,
+    sm_canal.[Value]                                        AS CanalDetection,
+    o.ParentAccountIdName                                   AS MaitreOuvrageMOA,       -- même valeur que NomCompteMOA
+    a.grdf_siret                                            AS SIRET,
+    l.createdon                                             AS CreeLeLead,
+    l.CreatedByName                                         AS CreeParLead,
+    l.grdf_demandeur                                        AS DemandeurLead,
+    o.grdf_date_mise_gaz_prevue                             AS DateMiseGazPrevue,
+    o.grdf_date_mise_gaz_reelle                             AS DateMiseGazReelle,
+    o.grdf_branchement_gratuit                              AS BranchementGratuit,
+    o.grdf_reference_sirocco                                AS ReferenceSirocco,
+    o.grdf_adresse                                          AS Adresse,
+    o.grdf_ville                                            AS Ville,
+    o.grdf_code_postal                                      AS CodePostal,
+    o.grdf_date_meg_convenue_client                         AS DateMEGConvenueClient,
+    o.grdf_nombre_appartements                              AS NombreAppartements,
+    o.grdf_date_prevue_accord_du_client                     AS DatePrevueAccordClient,
+    o.grdf_reference_externe                                AS ReferenceExterne,
+    o.OriginatingLeadIdName                                 AS LeadOrigine,
+    camp.name                                               AS CampagneSource
+FROM Opportunity o
+LEFT JOIN Account a
+    ON a.AccountId = o.ParentAccountId
+LEFT JOIN Lead l
+    ON l.LeadId = o.OriginatingLeadId
+LEFT JOIN grdf_local gl
+    ON gl.grdf_localid = o.grdf_localid
+LEFT JOIN Campaign camp
+    ON camp.CampaignId = o.CampaignId
+-- Résolution des libellés (picklists, non résolus par la vue Opportunity)
+-- en français (LangId = 1036)
+LEFT JOIN StringMap sm_state
+    ON sm_state.ObjectTypeCode = 3 AND sm_state.AttributeName = 'statecode'
+   AND sm_state.AttributeValue = o.StateCode  AND sm_state.LangId = 1036
+LEFT JOIN StringMap sm_status
+    ON sm_status.ObjectTypeCode = 3 AND sm_status.AttributeName = 'statuscode'
+   AND sm_status.AttributeValue = o.StatusCode AND sm_status.LangId = 1036
+LEFT JOIN StringMap sm_fid
+    ON sm_fid.ObjectTypeCode = 3 AND sm_fid.AttributeName = 'grdf_fidelisation'
+   AND sm_fid.AttributeValue = o.grdf_fidelisation AND sm_fid.LangId = 1036
+LEFT JOIN StringMap sm_mecfid
+    ON sm_mecfid.ObjectTypeCode = 3 AND sm_mecfid.AttributeName = 'grdf_mecanique_fidelisation'
+   AND sm_mecfid.AttributeValue = o.grdf_mecanique_fidelisation AND sm_mecfid.LangId = 1036
+LEFT JOIN StringMap sm_segm
+    ON sm_segm.ObjectTypeCode = 3 AND sm_segm.AttributeName = 'grdf_segment_marche'
+   AND sm_segm.AttributeValue = o.grdf_segment_marche AND sm_segm.LangId = 1036
+LEFT JOIN StringMap sm_segd
+    ON sm_segd.ObjectTypeCode = 3 AND sm_segd.AttributeName = 'grdf_segment_dev'
+   AND sm_segd.AttributeValue = o.grdf_segment_dev AND sm_segd.LangId = 1036
+LEFT JOIN StringMap sm_exneuf
+    ON sm_exneuf.ObjectTypeCode = 3 AND sm_exneuf.AttributeName = 'grdf_existant_neuf'
+   AND sm_exneuf.AttributeValue = o.grdf_existant_neuf AND sm_exneuf.LangId = 1036
+LEFT JOIN StringMap sm_canal
+    ON sm_canal.ObjectTypeCode = 3 AND sm_canal.AttributeName = 'grdf_canal_detection'
+   AND sm_canal.AttributeValue = o.grdf_canal_detection AND sm_canal.LangId = 1036
+LEFT JOIN StringMap sm_energie
+    ON sm_energie.ObjectTypeCode = 3 AND sm_energie.AttributeName = 'grdf_energie_place'
+   AND sm_energie.AttributeValue = o.grdf_energie_place AND sm_energie.LangId = 1036
+ORDER BY o.name ASC;
